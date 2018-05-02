@@ -164,6 +164,15 @@ def get_data():
             else:
                 data.append(data_row)
 
+        df = pd.DataFrame.from_records(data)
+        print('\nshape data')
+        print(df.shape)
+        print('\ndescribing float data')
+        print(df.describe())
+        print('\nindex types')
+        print(df.dtypes)
+        # Return de df
+
         return data, categorical_sets
 
 
