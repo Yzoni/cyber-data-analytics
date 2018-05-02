@@ -151,16 +151,15 @@ def get_data():
             else:
                 data.append(data_row)
 
-        df = pd.DataFrame.from_records(data)
+        dataframe = pd.DataFrame.from_records(data)
         print('\nshape data')
         print(df.shape)
         print('\ndescribing float data')
         print(df.describe())
         print('\nindex types')
         print(df.dtypes)
-        # Return de df
 
-        return data, categorical_sets
+        return data, dataframe, categorical_sets
 
 
 def create_x_y_sets(data, categorical_sets):
@@ -274,7 +273,7 @@ def k_nearest_neighbour(x, y):
 
 
 if __name__ == '__main__':
-    data, categorical_sets = get_data()
+    data, dataframe, categorical_sets = get_data()
 
     features, labels = create_x_y_sets(data, categorical_sets)
 
