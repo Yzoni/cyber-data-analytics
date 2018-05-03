@@ -22,6 +22,7 @@ from sklearn import svm
 from sklearn import preprocessing
 from sklearn.metrics import classification_report
 
+
 df = pd.read_csv('data_for_student_case.csv')
 print('\nshape data')
 print(df.shape)
@@ -29,6 +30,7 @@ print('\ndescribing float data')
 print(df.describe())
 print('\nindex types')
 print(df.dtypes)
+print(df.columns)
 
 # df_input = (df1[['id','booking_date','issuer_country','tx_variant','issuer_id','amount','currency','shopper_country','shopper_interaction','fraud','verification','cvc_response','creation_date','account_code','mail_id', 'ip','card_id']])
 # df_input[['issuer_id','label_int']] = df_input[['issuer_id','label_int']].astype(int)
@@ -36,15 +38,17 @@ print(df.dtypes)
 # x = df_input[df_input.columns[0:-1]].as_matrix()
 # y = df_input[df_input.columns[-1]].as_matrix()
 #
-CATEGORICAL = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction', 'verification','account_code']
-
-def cat_to_nr(categorical_set: set, element):
-    """
-    Modify categorical feature to number in data set
-    """
-    return list(categorical_set).index(element)
+CATEGORICAL = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction', 'verification',
+               'account_code']
 
 
+# def cat_to_nr(categorical_set: set, element):
+#     """
+#     Modify categorical feature to number in data set
+#     """
+#     return list(categorical_set).index(element)
+#
+#
 def get_data():
     with open('data_for_student_case.csv') as csv_file:
         reader = csv.DictReader(csv_file)
@@ -87,14 +91,16 @@ def get_data():
 
         dataframe = pd.DataFrame.from_records(data)
 
-        dataframe_sort_creation = dataframe.sort_values(by='creation_date',ascending= True)  # new Frame of data d to leave the original Frame of data the same
+        dataframe_sort_creation = dataframe.sort_values(by='creation_date',
+                                                        ascending=True)  # new Frame of data d to leave the original Frame of data the same
         dataframe['creation_date'] = pd.to_datetime(dataframe['creation_date'])
         dataframe['booking_date'] = pd.to_datetime(dataframe['booking_date'])
         dataframe['euro'] = map(lambda x, y: currency_dict[y] * x, dataframe['amount'], dataframe['currency'])
-        currency_dict = {'SEK': 0.01 * 0.11, 'MXN': 0.01 * 0.05, 'AUD': 0.01 * 0.67, 'NZD': 0.01 * 0.61, 'GBP': 1.28 *0.01 }
+        currency_dict = {'SEK': 0.01 * 0.11, 'MXN': 0.01 * 0.05, 'AUD': 0.01 * 0.67, 'NZD': 0.01 * 0.61,
+                         'GBP': 1.28 * 0.01}
         key = lambda k: (k.year, k.month, k.day)
-        #print(dataframe_sort_creation.groupby(dataframe_sort_creation['creation_date'].apply(key)).mean()['amount'])
-        #print(dataframe.groupby(dataframe['booking_date'].apply(key)))
+        # print(dataframe_sort_creation.groupby(dataframe_sort_creation['creation_date'].apply(key)).mean()['amount'])
+        # print(dataframe.groupby(dataframe['booking_date'].apply(key)))
 
         print('\nshape data')
         print(dataframe.shape)
@@ -102,7 +108,19 @@ def get_data():
         print(dataframe.describe())
         print('\nindex types')
         print(dataframe.dtypes)
-        print((dataframe.apply[[CATEGORICAL]]==0).sum())
+        # print((dataframe.apply[[CATEGORICAL]]==0).sum())
+        dataframe = dataframe.sample(frac=0.1, random_state=1)  # less reliable results but better for computations
+        print(dataframe.shape)
+        # plotting histogram of each feature
+        dataframe.hist(figsize=(20, 20))
+        plt.show()  # omzetten die type objecten ook naar float waardes.. meer histograms nodig van alle features... en kijk naar outliers
+
+        Fraud = dataframe[dataframe['fraud'] == 1]
+        Valid = dataframe[dataframe['fraud'] == 0]
+        outlier_fraction = len(Fraud) / float(len(Valid))
+        print(outlier_fraction)
+        print('Cases which are Fraud: {}'.format(len(Fraud)))
+        print('Cases which are Valid: {}'.format(len(Valid)))
 
         return data, dataframe, categorical_sets
 
@@ -187,7 +205,7 @@ def create_roc_curve(clf, x_test, y_test):
 
 def logistic_regression(x, y):
     for x_train, x_test, y_train, y_test in split_dataset(x, y):
-        clf = linear_model.LogisticRegression(C=1e5)
+        clf = linear_model.LogistifcRegression(C=1e5)
         clf.fit(x_train, y_train)
 
         cross_validate(clf, x_test, y_test)
@@ -215,6 +233,10 @@ def k_nearest_neighbour(x, y):
         clf.fit(x_train, y_train)
 
         cross_validate(clf, x_test, y_test)
+
+
+
+        metrics= pd.DataFrame(index=['accuracy', 'precision', 'recall'], columns= ['NULL', 'LogisticReg'])
 
 
 if __name__ == '__main__':
