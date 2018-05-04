@@ -72,13 +72,15 @@ def get_data():
                     'currency': row['currencycode'],
                     'shopper_country': row['shoppercountrycode'],
                     'shopper_interaction': row['shopperinteraction'],
-                    'fraud': 1 if row['simple_journal'] == 'Chargeback' else 0,
+                    'fraud': 1 if row['simple_journal'] == 'Chargeback'else 0,
                     'verification': row['cardverificationcodesupplied'],
                     'cvc_response': 3 if int(row['cvcresponsecode']) > 2 else row['cvcresponsecode'],
                     'creation_date': datetime.strptime(row['creationdate'], '%Y-%m-%d %H:%M:%S'),
                     'account_code': row['accountcode'],
                     'mail_id': row['mail_id'], 'ip': row['ip_id'],
                     'card_id': row['card_id']
+
+
                 }
 
                 for category in categorical_sets:
@@ -108,6 +110,16 @@ def get_data():
         print(dataframe.describe())
         print('\nindex types')
         print(dataframe.dtypes)
+
+        Fraud = dataframe[dataframe['fraud'] ==1]
+        NonFraud= dataframe[dataframe['fraud'] ==0 ]
+        outlier_fraction = len(Fraud) / float(len(NonFraud))
+        print(outlier_fraction)
+        print('Cases which are Fraud:')
+        print(format(len(Fraud)))
+        print('Cases which are NonFraud:')
+        print(format(len(NonFraud)))
+
         # print((dataframe.apply[[CATEGORICAL]]==0).sum())
         dataframe = dataframe.sample(frac=0.1, random_state=1)  # less reliable results but better for computations
         print(dataframe.shape)
@@ -115,12 +127,7 @@ def get_data():
         dataframe.hist(figsize=(20, 20))
         plt.show()  # omzetten die type objecten ook naar float waardes.. meer histograms nodig van alle features... en kijk naar outliers
 
-        Fraud = dataframe[dataframe['fraud'] == 1]
-        Valid = dataframe[dataframe['fraud'] == 0]
-        outlier_fraction = len(Fraud) / float(len(Valid))
-        print(outlier_fraction)
-        print('Cases which are Fraud: {}'.format(len(Fraud)))
-        print('Cases which are Valid: {}'.format(len(Valid)))
+
 
         return data, dataframe, categorical_sets
 
