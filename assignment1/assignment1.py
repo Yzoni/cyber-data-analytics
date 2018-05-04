@@ -1,9 +1,8 @@
 import csv
 from datetime import datetime
-from sklearn import neighbors, linear_model
 import numpy as np
 from collections import defaultdict
-
+import pdb
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
@@ -12,16 +11,13 @@ from imblearn.over_sampling import SMOTE
 # from imblearn.over_sampling import UnderSampler
 # from imblearn.over_sampling import UnbalancedDataset
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import roc_curve, auc, precision_recall_curve, f1_score, precision_score
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, IsolationForest
+from sklearn.neighbors import LocalOutlierFactor
 from sklearn.model_selection import KFold
 import seaborn as sns
-from sklearn import svm
-from sklearn import preprocessing
-from sklearn.metrics import classification_report
-
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn import svm, preprocessing, neighbors, linear_model
+from sklearn.metrics import classification_report, accuracy_score, roc_curve, auc, precision_recall_curve, f1_score, precision_score, confusion_matrix
 
 df = pd.read_csv('data_for_student_case.csv')
 print('\nshape data')
@@ -32,23 +28,35 @@ print('\nindex types')
 print(df.dtypes)
 print(df.columns)
 
-# df_input = (df1[['id','booking_date','issuer_country','tx_variant','issuer_id','amount','currency','shopper_country','shopper_interaction','fraud','verification','cvc_response','creation_date','account_code','mail_id', 'ip','card_id']])
-# df_input[['issuer_id','label_int']] = df_input[['issuer_id','label_int']].astype(int)
-# print (df_input.dtypes)
-# x = df_input[df_input.columns[0:-1]].as_matrix()
-# y = df_input[df_input.columns[-1]].as_matrix()
-#
+#Ik kan niet alleen de correcte  ge encoded column uit elke krijgen.
+
+#encoding de column txtvariantcode
+X = df.iloc[:,:].values
+labelencoder_X= LabelEncoder()
+
+X[:,3]= labelencoder_X.fit_transform(X[:,3])
+Y=pd.DataFrame(X)
+print(Y)
+
+#encoding de column issuercountrycode
+B= df.iloc[:,:].values
+labelencoder_B= LabelEncoder()
+B[:,2]= labelencoder_B.fit_transform(B[:,3])
+G=pd.DataFrame(B)
+print(G)
+
+
+
+names = []
+grouping_names = range(0, 500)
+counter = 0
+
+
 CATEGORICAL = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction', 'verification',
                'account_code']
 
 
-# def cat_to_nr(categorical_set: set, element):
-#     """
-#     Modify categorical feature to number in data set
-#     """
-#     return list(categorical_set).index(element)
-#
-#
+
 def get_data():
     with open('data_for_student_case.csv') as csv_file:
         reader = csv.DictReader(csv_file)
@@ -93,8 +101,7 @@ def get_data():
 
         dataframe = pd.DataFrame.from_records(data)
 
-        dataframe_sort_creation = dataframe.sort_values(by='creation_date',
-                                                        ascending=True)  # new Frame of data d to leave the original Frame of data the same
+        dataframe_sort_creation = dataframe.sort_values(by='creation_date',ascending=True)  # new Frame of data d to leave the original Frame of data the same
         dataframe['creation_date'] = pd.to_datetime(dataframe['creation_date'])
         dataframe['booking_date'] = pd.to_datetime(dataframe['booking_date'])
         dataframe['euro'] = map(lambda x, y: currency_dict[y] * x, dataframe['amount'], dataframe['currency'])
@@ -120,16 +127,91 @@ def get_data():
         print('Cases which are NonFraud:')
         print(format(len(NonFraud)))
 
-        # print((dataframe.apply[[CATEGORICAL]]==0).sum())
-        dataframe = dataframe.sample(frac=0.1, random_state=1)  # less reliable results but better for computations
+
+
+
+
+
+
+        # correlation matrix
+        corrmat = dataframe.corr()
+        fig = plt.figure(figsize=(12, 9))
+        sns.heatmap(corrmat, vmax=0.8, square=True)
+        #plt.show()
+
+
+
+
+
+
+
+        # less reliable results but better for computations
+        dataframe = dataframe.sample(frac=0.1, random_state=1)
         print(dataframe.shape)
+
         # plotting histogram of each feature
         dataframe.hist(figsize=(20, 20))
-        plt.show()  # omzetten die type objecten ook naar float waardes.. meer histograms nodig van alle features... en kijk naar outliers
+        #plt.show()  # omzetten die type objecten ook naar float waardes.. meer histograms nodig van alle features... en kijk naar outliers
+
+
+
+
+
+        #all data colums and target data column
+        columns = dataframe.columns.tolist()
+        target= 'fraud'
+
+        columns= [ c for c in columns if c not in ['fraud']]
+        all= dataframe[columns]
+        print(all.shape)
+
+        print('our target:')
+        target1= dataframe[target]
+        print(target1.shape)
+
+        # random state
+        state = 1
+        # outlier detection methods
+        classifiers = {
+            "Isolation Forest": IsolationForest(max_samples=len(all), contamination=outlier_fraction, random_state=state),
+            "Local Outlier Factor": LocalOutlierFactor(n_neighbors=20, contamination=outlier_fraction)}
+
+        #Fit model
+        n_outliers= len(Fraud)    # fit data and tag outliers
+        for i, (clf_name, clf) in enumerate(classifiers.items()):
+         if clf_name == "Local Outlier Factor":
+            predictTarget= clf.fit_predict(all)
+            scores_pred = clf.negative_outlier_factor_
+        else:
+            clf.fit(all)
+            scores_pred = clf.decision_function(all)
+            predictTarget = clf.predict(all)
+
+        # Reshape prediction values to 0 for nonFraud and 1 for Fraud
+        predictTarget[predictTarget ==1] = 0
+        predictTarget[predictTarget == -1] = 1
+
+        numberErrors = (predictTarget != target1).sum()
+
+        # classification matrix
+        print('{}: {}'.format(clf_name,numberErrors))
+        print(accuracy_score(target1, predictTarget))
+        print(classification_report(target1,predictTarget)) #dit werkt, als we als die objects kunnen omzetten in float..
+
+
+
+
+
+
 
 
 
         return data, dataframe, categorical_sets
+
+
+
+
+
 
 
 def create_x_y_sets(data, categorical_sets):
@@ -137,12 +219,43 @@ def create_x_y_sets(data, categorical_sets):
                          'shopper_interaction', 'verification', 'cvc_response', 'account_code']
     features = []
     labels = []
-
     for row in data:
         features.append([row[x] if x not in CATEGORICAL else cat_to_nr(categorical_sets[x], row[x])
                          for x in selected_features])
         labels.append(row['fraud'])
+
+    # for name in names:
+    #     (name = counter, counter+= 1)
+    #     for row in data:
+    #         features.append #elke verschillende categorische uitkomst een nummer aan verbinden en deze updaten in de dataset met getal.
+
+
     return np.array(features).astype(float), np.array(labels).astype(float)
+
+
+
+
+  # def cat_to_nr(categorical_set, element):
+  # for element in categorical_set:
+  #           categorical_set.append(element if element not in categorical_set
+
+
+
+
+
+
+      #return list(categorical_set).index(element)
+
+#
+# def toNumber(x):
+#     if x == element:
+#         return counter
+#
+#
+# #    for rowName in categorical_setsName:
+# #        if(rowName not in names):  ( names.append(rowName))
+
+
 
 
 def transpose_to_transactions_per_card(data):
@@ -255,3 +368,4 @@ if __name__ == '__main__':
     logistic_regression(features, labels)
     random_forest(features, labels)
     support_vector_machine(features, labels)
+    pdb.set_trace()
