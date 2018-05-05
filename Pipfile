@@ -11,6 +11,7 @@ scipy = "*"
 matplotlib = "*"
 pandas = "*"
 seaborn = "*"
+"progressbar2" = "*"
 
 [dev-packages]
 
