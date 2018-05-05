@@ -15,9 +15,10 @@ from sklearn.ensemble import RandomForestClassifier, IsolationForest
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.model_selection import KFold
 import seaborn as sns
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler, Imputer
 from sklearn import svm, preprocessing, neighbors, linear_model
 from sklearn.metrics import classification_report, accuracy_score, roc_curve, auc, precision_recall_curve, f1_score, precision_score, confusion_matrix
+
 
 df = pd.read_csv('data_for_student_case.csv')
 print('\nshape data')
@@ -28,28 +29,33 @@ print('\nindex types')
 print(df.dtypes)
 print(df.columns)
 
-#Ik kan niet alleen de correcte  ge encoded column uit elke krijgen.
+#Lukt mij niet om alle columns te transformen.. had iets met datamapper en seriesimputter geprobeerd maar lukte allemaal niet.
 
 #encoding de column txtvariantcode
+
+
 X = df.iloc[:,:].values
 labelencoder_X= LabelEncoder()
-
 X[:,3]= labelencoder_X.fit_transform(X[:,3])
 Y=pd.DataFrame(X)
 print(Y)
 
+
 #encoding de column issuercountrycode
-B= df.iloc[:,:].values
-labelencoder_B= LabelEncoder()
-B[:,2]= labelencoder_B.fit_transform(B[:,3])
-G=pd.DataFrame(B)
-print(G)
+
+# B= df.iloc[:,:].values
+# labelencoder_B= LabelEncoder()
+# B[:,2]= labelencoder_B.fit_transform(B[:,2])
+# G=pd.DataFrame(B)
+# print(G)
 
 
 
-names = []
-grouping_names = range(0, 500)
-counter = 0
+# Een probeersel met encoding met def cat_to_nr(categorical_set, element) maar lukte ook niet..
+
+# names = []
+# grouping_names = range(0, 500)
+# counter = 0
 
 
 CATEGORICAL = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction', 'verification',
@@ -128,21 +134,11 @@ def get_data():
         print(format(len(NonFraud)))
 
 
-
-
-
-
-
-        # correlation matrix
+        # correlation matrix: heatmap
         corrmat = dataframe.corr()
         fig = plt.figure(figsize=(12, 9))
         sns.heatmap(corrmat, vmax=0.8, square=True)
         #plt.show()
-
-
-
-
-
 
 
         # less reliable results but better for computations
@@ -152,9 +148,6 @@ def get_data():
         # plotting histogram of each feature
         dataframe.hist(figsize=(20, 20))
         #plt.show()  # omzetten die type objecten ook naar float waardes.. meer histograms nodig van alle features... en kijk naar outliers
-
-
-
 
 
         #all data colums and target data column
@@ -169,42 +162,36 @@ def get_data():
         target1= dataframe[target]
         print(target1.shape)
 
-        # random state
+        random state
         state = 1
         # outlier detection methods
         classifiers = {
-            "Isolation Forest": IsolationForest(max_samples=len(all), contamination=outlier_fraction, random_state=state),
-            "Local Outlier Factor": LocalOutlierFactor(n_neighbors=20, contamination=outlier_fraction)}
-
-        #Fit model
-        n_outliers= len(Fraud)    # fit data and tag outliers
-        for i, (clf_name, clf) in enumerate(classifiers.items()):
-         if clf_name == "Local Outlier Factor":
-            predictTarget= clf.fit_predict(all)
-            scores_pred = clf.negative_outlier_factor_
-        else:
-            clf.fit(all)
-            scores_pred = clf.decision_function(all)
-            predictTarget = clf.predict(all)
-
-        # Reshape prediction values to 0 for nonFraud and 1 for Fraud
-        predictTarget[predictTarget ==1] = 0
-        predictTarget[predictTarget == -1] = 1
-
-        numberErrors = (predictTarget != target1).sum()
-
-        # classification matrix
-        print('{}: {}'.format(clf_name,numberErrors))
-        print(accuracy_score(target1, predictTarget))
-        print(classification_report(target1,predictTarget)) #dit werkt, als we als die objects kunnen omzetten in float..
-
-
-
-
-
-
-
-
+            "Logistic Reggresion": IsolationForest(max_samples=len(all), contamination=outlier_fraction, random_state=state),
+            "Support vector machine": LocalOutlierFactor(n_neighbors=20, contamination=outlier_fraction),
+            "random forest": LocalOutlierFactor(n_neighbors=20, contamination=outlier_fraction)
+        }
+        #
+        # #Fit model
+        # n_outliers= len(Fraud)    # fit data and tag outliers
+        # for i, (clf_name, clf) in enumerate(classifiers.items()):
+        #  if clf_name == "Local Outlier Factor":
+        #     predictTarget= clf.fit_predict(all)
+        #     scores_pred = clf.negative_outlier_factor_
+        # else:
+        #     clf.fit(all)
+        #     scores_pred = clf.decision_function(all)
+        #     predictTarget = clf.predict(all)
+        #
+        # # Reshape prediction values to 0 for nonFraud and 1 for Fraud
+        # predictTarget[predictTarget ==1] = 0
+        # predictTarget[predictTarget == -1] = 1
+        #
+        # numberErrors = (predictTarget != target1).sum()
+        #
+        # # classification matrix
+        # print('{}: {}'.format(clf_name,numberErrors))
+        # print(accuracy_score(target1, predictTarget))
+        # print(classification_report(target1,predictTarget)) #dit werkt, als we als die objects kunnen omzetten in float..
 
         return data, dataframe, categorical_sets
 
@@ -329,6 +316,7 @@ def logistic_regression(x, y):
         clf.fit(x_train, y_train)
 
         cross_validate(clf, x_test, y_test)
+
 
 
 def random_forest(x, y):
