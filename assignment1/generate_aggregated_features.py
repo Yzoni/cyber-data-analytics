@@ -17,7 +17,7 @@ def create(conn, data: list):
     rows = [(row['id'], row['booking_date'], row['issuer_country'], row['tx_variant'], row['issuer_id'], row['amount'],
              row['currency'], row['shopper_country'], row['shopper_interaction'], row['fraud'], row['verification'],
              row['cvc_response'], row['creation_date'], row['account_code'],
-             row['mail_id'], row['card_id']) for row in postprocessed_data]
+             row['mail_id'], row['card_id']) for row in data]
 
     c.executemany('''INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', rows)
     conn.commit()
