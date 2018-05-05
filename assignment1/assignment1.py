@@ -1,281 +1,186 @@
 import csv
-from datetime import datetime
-import numpy as np
 from collections import defaultdict
-import pdb
+from datetime import datetime
+from pprint import pprint
+
+import numpy as np
 import pandas as pd
-import time
-import matplotlib.pyplot as plt
 # from imblearn.over_sampling import over_sampling
 from imblearn.over_sampling import SMOTE
+from sklearn import svm, neighbors, linear_model
 # from imblearn.over_sampling import UnderSampler
 # from imblearn.over_sampling import UnbalancedDataset
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, IsolationForest
-from sklearn.neighbors import LocalOutlierFactor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
-import seaborn as sns
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from sklearn import svm, preprocessing, neighbors, linear_model
-from sklearn.metrics import classification_report, accuracy_score, roc_curve, auc, precision_recall_curve, f1_score, precision_score, confusion_matrix
+from sklearn.model_selection import train_test_split
 
-df = pd.read_csv('data_for_student_case.csv')
-print('\nshape data')
-print(df.shape)
-print('\ndescribing float data')
-print(df.describe())
-print('\nindex types')
-print(df.dtypes)
-print(df.columns)
+import visualize
+import util
 
-#Ik kan niet alleen de correcte  ge encoded column uit elke krijgen.
-
-#encoding de column txtvariantcode
-X = df.iloc[:,:].values
-labelencoder_X= LabelEncoder()
-
-X[:,3]= labelencoder_X.fit_transform(X[:,3])
-Y=pd.DataFrame(X)
-print(Y)
-
-#encoding de column issuercountrycode
-B= df.iloc[:,:].values
-labelencoder_B= LabelEncoder()
-B[:,2]= labelencoder_B.fit_transform(B[:,3])
-G=pd.DataFrame(B)
-print(G)
+# Constant describing the labels in the dataset that have a discrete value as string the raw data
+DISCRETE_STRING_FEATURES = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction',
+                            'verification', 'account_code']
 
 
+def load_data():
+    """
+    Reads the raw csv data into a list of dictionaries
 
-names = []
-grouping_names = range(0, 500)
-counter = 0
+    :returns:
+     - [{'account_code': 'MexicoAccount',
+      'amount': 64900.0,
+      'booking_date': datetime.datetime(2015, 8, 13, 18, 17, 46),
+      'card_id': 'card255564',
+      'creation_date': datetime.datetime(2015, 8, 13, 18, 17, 35),
+      'currency': 'MXN',
+      'cvc_response': '0',
+      'fraud': 0,
+      'id': '30906',
+      'ip': 'ip80818',
+      'issuer_country': 'MX',
+      'issuer_id': 544549.0,
+      'mail_id': 'email93243',
+      'shopper_country': 'MX',
+      'shopper_interaction': 'Ecommerce',
+      'tx_variant': 'mccredit',
+      'verification': 'TRUE'},
+      ...]
+      - 'shopper_interaction': {'Ecommerce'}, # For each key list all possible values
+        'tx_variant': {'cirrus', 'electron', ...
+    """
 
-
-CATEGORICAL = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction', 'verification',
-               'account_code']
-
-
-
-def get_data():
     with open('data_for_student_case.csv') as csv_file:
         reader = csv.DictReader(csv_file)
 
-        categorical_sets = dict.fromkeys(CATEGORICAL, set())
+        categorical_sets = {key: set() for key in DISCRETE_STRING_FEATURES}
 
         data = []
         for row in reader:
 
-            if row['simple_journal'] == 'Refused':
-                continue
+            data_row = {
+                'id': row['txid'],
+                'booking_date': datetime.strptime(row['bookingdate'], '%Y-%m-%d %H:%M:%S'),
+                'issuer_country': row['issuercountrycode'] if row['issuercountrycode'] != 'NA' else None,
+                'tx_variant': row['txvariantcode'],
+                'issuer_id': float(row['bin']) if row['bin'].isnumeric() else None,
+                'amount': float(row['amount']),
+                'currency': row['currencycode'],
+                'shopper_country': row['shoppercountrycode'] if row['shoppercountrycode'] != 'NA' else None,
+                'shopper_interaction': row['shopperinteraction'],
+                'fraud': 1 if row['simple_journal'] == 'Chargeback' else 0,  # TODO: SEE handle_missing_data()
+                'verification': row['cardverificationcodesupplied'] if row[
+                                                                           'cardverificationcodesupplied'] != 'NA' else None,
+                'cvc_response': 3 if int(row['cvcresponsecode']) > 2 else row['cvcresponsecode'],
+                'creation_date': datetime.strptime(row['creationdate'], '%Y-%m-%d %H:%M:%S'),
+                'account_code': row['accountcode'],
+                'mail_id': row['mail_id'], 'ip': row['ip_id'],
+                'card_id': row['card_id']
 
-            try:
-                data_row = {
-                    'id': row['txid'],
-                    'booking_date': datetime.strptime(row['bookingdate'], '%Y-%m-%d %H:%M:%S'),
-                    'issuer_country': row['issuercountrycode'],
-                    'tx_variant': row['txvariantcode'],
-                    'issuer_id': float(row['bin']),
-                    'amount': float(row['amount']),
-                    'currency': row['currencycode'],
-                    'shopper_country': row['shoppercountrycode'],
-                    'shopper_interaction': row['shopperinteraction'],
-                    'fraud': 1 if row['simple_journal'] == 'Chargeback'else 0,
-                    'verification': row['cardverificationcodesupplied'],
-                    'cvc_response': 3 if int(row['cvcresponsecode']) > 2 else row['cvcresponsecode'],
-                    'creation_date': datetime.strptime(row['creationdate'], '%Y-%m-%d %H:%M:%S'),
-                    'account_code': row['accountcode'],
-                    'mail_id': row['mail_id'], 'ip': row['ip_id'],
-                    'card_id': row['card_id']
+            }
 
+            for category in categorical_sets:
+                categorical_sets[category].add(data_row[category])
 
-                }
+            data.append(data_row)
 
-                for category in categorical_sets:
-                    categorical_sets[category].add(data_row[category])
-
-            except ValueError as e:
-                print('Error on {}, {}'.format(row['txid'], e))
-            else:
-                data.append(data_row)
-
-        dataframe = pd.DataFrame.from_records(data)
-
-        dataframe_sort_creation = dataframe.sort_values(by='creation_date',ascending=True)  # new Frame of data d to leave the original Frame of data the same
-        dataframe['creation_date'] = pd.to_datetime(dataframe['creation_date'])
-        dataframe['booking_date'] = pd.to_datetime(dataframe['booking_date'])
-        dataframe['euro'] = map(lambda x, y: currency_dict[y] * x, dataframe['amount'], dataframe['currency'])
-        currency_dict = {'SEK': 0.01 * 0.11, 'MXN': 0.01 * 0.05, 'AUD': 0.01 * 0.67, 'NZD': 0.01 * 0.61,
-                         'GBP': 1.28 * 0.01}
-        key = lambda k: (k.year, k.month, k.day)
-        # print(dataframe_sort_creation.groupby(dataframe_sort_creation['creation_date'].apply(key)).mean()['amount'])
-        # print(dataframe.groupby(dataframe['booking_date'].apply(key)))
-
-        print('\nshape data')
-        print(dataframe.shape)
-        print('\ndescribing float data')
-        print(dataframe.describe())
-        print('\nindex types')
-        print(dataframe.dtypes)
-
-        Fraud = dataframe[dataframe['fraud'] ==1]
-        NonFraud= dataframe[dataframe['fraud'] ==0 ]
-        outlier_fraction = len(Fraud) / float(len(NonFraud))
-        print(outlier_fraction)
-        print('Cases which are Fraud:')
-        print(format(len(Fraud)))
-        print('Cases which are NonFraud:')
-        print(format(len(NonFraud)))
+        return data, categorical_sets
 
 
+def handle_missing_data(data: list, show=True):
+    """
+    missing_data_count_per_column = {'issuer_country': 493, # feature name: total number missing
+                                     'issuer_id': 140,
+                                     'shopper_country': 482,
+                                     'verification': 14717})
 
 
+    missing_data_row_idxs = {167: ['issuer_country'], # IDx of row in CSV: feature that is missing
+                             202: ['issuer_country'],
+                             211: ['issuer_country'],
+                             533: ['issuer_country'],
+                             534: ['issuer_country'],
+                             536: ['issuer_country'],
+                             538: ['issuer_country'],
+                             625: ['issuer_country'],
+                             ....
+
+    """
+    missing_data_count_per_column = defaultdict(lambda: 0)
+    missing_data_row_idxs = defaultdict(list)
+
+    for row_index, row in enumerate(data):
+        for key, value in row.items():
+            if value is None:
+                missing_data_count_per_column[key] += 1
+                missing_data_row_idxs[row_index].append(key)
+
+    if show:
+        pprint(missing_data_count_per_column)
+        pprint(missing_data_row_idxs)
+
+    # TODO: actually handle missing instead of just deleting and also handle "Refused" status
+    for idx in sorted(list(missing_data_row_idxs.keys()), reverse=True):
+        del data[idx]
+
+    return data
 
 
+def postprocess_data(data: list):
+    """
+    - Fix or remove missing data
+    - Normalizes the value of each transaction based on currency type
+    """
 
-        # correlation matrix
-        corrmat = dataframe.corr()
-        fig = plt.figure(figsize=(12, 9))
-        sns.heatmap(corrmat, vmax=0.8, square=True)
-        #plt.show()
+    data = handle_missing_data(data)
 
+    # Normalize currency value in place
+    currency_dict = {'SEK': 0.01 * 0.11, 'MXN': 0.01 * 0.05, 'AUD': 0.01 * 0.67, 'NZD': 0.01 * 0.61,
+                     'GBP': 1.28 * 0.01}  # TODO are this all the currencies?
+    for row in data:
+        row['amount'] = currency_dict[row['currency']] * row['amount']
 
-
-
-
-
-
-        # less reliable results but better for computations
-        dataframe = dataframe.sample(frac=0.1, random_state=1)
-        print(dataframe.shape)
-
-        # plotting histogram of each feature
-        dataframe.hist(figsize=(20, 20))
-        #plt.show()  # omzetten die type objecten ook naar float waardes.. meer histograms nodig van alle features... en kijk naar outliers
+    return data
 
 
+def create_x_y_sets(data: list, categorical_sets: dict):
+    """
+    Returns separate sets for the features and labels
 
+    Also converts non numerical features to a numeric value
+    """
 
-
-        #all data colums and target data column
-        columns = dataframe.columns.tolist()
-        target= 'fraud'
-
-        columns= [ c for c in columns if c not in ['fraud']]
-        all= dataframe[columns]
-        print(all.shape)
-
-        print('our target:')
-        target1= dataframe[target]
-        print(target1.shape)
-
-        # random state
-        state = 1
-        # outlier detection methods
-        classifiers = {
-            "Isolation Forest": IsolationForest(max_samples=len(all), contamination=outlier_fraction, random_state=state),
-            "Local Outlier Factor": LocalOutlierFactor(n_neighbors=20, contamination=outlier_fraction)}
-
-        #Fit model
-        n_outliers= len(Fraud)    # fit data and tag outliers
-        for i, (clf_name, clf) in enumerate(classifiers.items()):
-         if clf_name == "Local Outlier Factor":
-            predictTarget= clf.fit_predict(all)
-            scores_pred = clf.negative_outlier_factor_
-        else:
-            clf.fit(all)
-            scores_pred = clf.decision_function(all)
-            predictTarget = clf.predict(all)
-
-        # Reshape prediction values to 0 for nonFraud and 1 for Fraud
-        predictTarget[predictTarget ==1] = 0
-        predictTarget[predictTarget == -1] = 1
-
-        numberErrors = (predictTarget != target1).sum()
-
-        # classification matrix
-        print('{}: {}'.format(clf_name,numberErrors))
-        print(accuracy_score(target1, predictTarget))
-        print(classification_report(target1,predictTarget)) #dit werkt, als we als die objects kunnen omzetten in float..
-
-
-
-
-
-
-
-
-
-        return data, dataframe, categorical_sets
-
-
-
-
-
-
-
-def create_x_y_sets(data, categorical_sets):
+    # The features that need to be selected for the feature matrix
     selected_features = ['issuer_country', 'issuer_id', 'amount', 'currency', 'shopper_country',
                          'shopper_interaction', 'verification', 'cvc_response', 'account_code']
     features = []
     labels = []
     for row in data:
-        features.append([row[x] if x not in CATEGORICAL else cat_to_nr(categorical_sets[x], row[x])
+        features.append([row[x] if x not in DISCRETE_STRING_FEATURES else util.nonnr_to_nr(categorical_sets[x], row[x])
                          for x in selected_features])
         labels.append(row['fraud'])
-
-    # for name in names:
-    #     (name = counter, counter+= 1)
-    #     for row in data:
-    #         features.append #elke verschillende categorische uitkomst een nummer aan verbinden en deze updaten in de dataset met getal.
-
 
     return np.array(features).astype(float), np.array(labels).astype(float)
 
 
-
-
-  # def cat_to_nr(categorical_set, element):
-  # for element in categorical_set:
-  #           categorical_set.append(element if element not in categorical_set
-
-
-
-
-
-
-      #return list(categorical_set).index(element)
-
-#
-# def toNumber(x):
-#     if x == element:
-#         return counter
-#
-#
-# #    for rowName in categorical_setsName:
-# #        if(rowName not in names):  ( names.append(rowName))
-
-
-
-
-def transpose_to_transactions_per_card(data):
-    transactions_per_card = defaultdict(list)
-    for row in data:
-        transactions_per_card[row['card_id']].append(data)
-    return transactions_per_card
-
-
-def split_dataset(x, y, smote=True, **kwargs):
+def split_dataset(x, y, kfold, smote, **kwargs):
     """
-    Yield 10-fold cross-validation sets and optionally smote the training data
+    Yield cross-validation sets and optionally smote the training data
     """
-    kf = KFold(n_splits=10)
-    for train_index, test_index in kf.split(features):
-        x_train, x_test, y_train, y_test = x[train_index], x[test_index], y[train_index], y[test_index]
+
+    if kfold:
+        kf = KFold(n_splits=10)
+        for train_index, test_index in kf.split(x):
+            x_train, x_test, y_train, y_test = x[train_index], x[test_index], y[train_index], y[test_index]
+            if smote:
+                x_train, y_train = SMOTE(**kwargs).fit_sample(x[train_index], y[train_index])
+
+            yield x_train, x_test, y_train, y_test
+    else:
+        x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
         if smote:
-            x_train, y_train = SMOTE(**kwargs).fit_sample(features[train_index], labels[train_index])
+            x_train, y_train = SMOTE(**kwargs).fit_sample(x_train, y_train)
 
-        yield x_train, x_test, y_train, y_test
+        yield x_train, x_test, y_train, y_test  # return "fake" iterator
 
 
 def cross_validate(clf, x_test, y_test):
@@ -298,74 +203,69 @@ def cross_validate(clf, x_test, y_test):
     print('TN: {}'.format(TN))
 
     if hasattr(clf, 'decision_function'):
-        create_roc_curve(clf, x_test, y_test)
+        visualize.plot_roc_curve(clf, x_test, y_test)
     else:
         print('Classifier does not have decision function')
 
 
-def create_roc_curve(clf, x_test, y_test):
-    y_score = clf.decision_function(x_test)
-
-    fpr, tpr, _ = roc_curve(y_test, y_score)
-    roc_auc = auc(fpr, tpr)
-
-    plt.figure()
-    lw = 2
-    plt.plot(fpr, tpr, color='darkorange',
-             lw=lw, label='ROC curve (area = {})'.format(roc_auc))
-    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver operating characteristic example')
-    plt.legend(loc="lower right")
-    plt.show()
-
-
-def logistic_regression(x, y):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y):
-        clf = linear_model.LogistifcRegression(C=1e5)
+def logistic_regression(x, y, kfold, smote):
+    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
+        clf = linear_model.LogisticRegression(C=1e5)
         clf.fit(x_train, y_train)
 
         cross_validate(clf, x_test, y_test)
 
 
-def random_forest(x, y):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y):
+def random_forest(x, y, kfold, smote):
+    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
         clf = RandomForestClassifier(random_state=0)
         clf.fit(x_train, y_train)
 
         cross_validate(clf, x_test, y_test)
 
 
-def support_vector_machine(x, y):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y):
+def support_vector_machine(x, y, kfold, smote):
+    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
         clf = svm.SVC()
         clf.fit(x_train, y_train)
 
         cross_validate(clf, x_test, y_test)
 
 
-def k_nearest_neighbour(x, y):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y):
+def k_nearest_neighbour(x, y, kfold, smote):
+    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
         clf = neighbors.KNeighborsClassifier(algorithm='kd_tree')
         clf.fit(x_train, y_train)
 
         cross_validate(clf, x_test, y_test)
 
-
-
-        metrics= pd.DataFrame(index=['accuracy', 'precision', 'recall'], columns= ['NULL', 'LogisticReg'])
+        metrics = pd.DataFrame(index=['accuracy', 'precision', 'recall'], columns=['NULL', 'LogisticReg'])
 
 
 if __name__ == '__main__':
-    data, dataframe, categorical_sets = get_data()
+    data, categorical_sets = load_data()
+    pprint(categorical_sets)
+    postprocessed_data = postprocess_data(data)
 
-    features, labels = create_x_y_sets(data, categorical_sets)
+    #################
+    # Visualize task
+    #################
+    # visualize.fraud_per_feature_category(postprocessed_data) # was een test
+    visualize.plot_visualizations(pd.DataFrame.from_records(postprocessed_data))
 
-    k_nearest_neighbour(features, labels)
-    logistic_regression(features, labels)
-    random_forest(features, labels)
-    support_vector_machine(features, labels)
-    pdb.set_trace()
+    #################
+    # Imbalance task
+    #################
+    features, labels = create_x_y_sets(postprocessed_data, categorical_sets)
+    logistic_regression(features, labels, kfold=False, smote=False)
+    # random_forest(features, labels, kfold=False, smote=False)
+    # support_vector_machine(features, labels, kfold=False, smote=False)
+
+    ######################
+    # Classification task
+    ######################
+    # Blackbox
+    logistic_regression(features, labels, kfold=True, smote=True)
+
+    # Whitebox
+    # random_forest(features, labels, kfold=True, smote=False)

@@ -88,9 +88,6 @@ df_sort_creation = df.sort_values(by = 'creationdate', ascending = True)#Returns
 key = lambda k:(k.year,k.month,k.day)
 #print df_sort_creation.groupby(df_sort_creation['creationdate'].apply(key)).mean()['amount']
 
-def num_missing(x):
-    return sum(x.isnull())
-
 df_renamed = df.rename(index=str, columns = {'txvariantcode': 'cardtype', 'bin': 'issuer_id', 'shopperinteraction': 'shoppingtype',
                    'simple_journal': 'label', 'cardverificationcodesupplied': 'cvcsupply',
                   'cvcresponsecode': 'cvcresponse', 'accountcode': 'merchant_id'})
@@ -98,7 +95,7 @@ df_select = (df_renamed[['issuercountrycode', 'cardtype', 'issuer_id', 'euro', '
               'shoppercountrycode', 'shoppingtype', 'label', 'cvcsupply', 'cvcresponse', 'merchant_id',
               'mail_id', 'ip_id', 'card_id']])
 print ("Missing values per column:")
-print (df_select.apply(num_missing, axis=0))
+print (df_select.apply(lambda x: sum(x.isnull()), axis=0))
 df_clean = df_select.fillna('missing')
 
 issuercountrycode_category = pd.Categorical(df_clean['issuercountrycode'])
