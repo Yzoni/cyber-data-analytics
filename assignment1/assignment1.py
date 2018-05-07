@@ -86,7 +86,7 @@ def load_data():
         return data, categorical_sets
 
 
-def handle_missing_data(data: list, show=True):
+def handle_missing_data(data: list, show=False):
     """
     missing_data_count_per_column = {'issuer_country': 493, # feature name: total number missing
                                      'issuer_id': 140,
@@ -167,6 +167,13 @@ def split_dataset(x, y, kfold, smote, **kwargs):
     Yield cross-validation sets and optionally smote the training data
     """
 
+    set_x_train = []
+    set_x_test = []
+    set_y_train = []
+    set_y_test = []
+
+    # TODO create 2 * 10 splits with given percentage fraud cases for each training set
+    # TODO or make sure fraud cases are equally distributed over training set
     if kfold:
         kf = KFold(n_splits=10)
         for train_index, test_index in kf.split(x):
@@ -174,13 +181,22 @@ def split_dataset(x, y, kfold, smote, **kwargs):
             if smote:
                 x_train, y_train = SMOTE(**kwargs).fit_sample(x[train_index], y[train_index])
 
-            yield x_train, x_test, y_train, y_test
+            set_x_train.append(x_train)
+            set_x_test.append(x_test)
+            set_y_train.append(y_train)
+            set_y_test.append(y_test)
     else:
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+
         if smote:
             x_train, y_train = SMOTE(**kwargs).fit_sample(x_train, y_train)
 
-        yield x_train, x_test, y_train, y_test  # return "fake" iterator
+        set_x_train.append(x_train)
+        set_x_test.append(x_test)
+        set_y_train.append(y_train)
+        set_y_test.append(y_test)
+
+    return set_x_train, set_x_test, set_y_train, set_y_test
 
 
 def cross_validate(clf, x_test, y_test):
@@ -202,62 +218,45 @@ def cross_validate(clf, x_test, y_test):
     print('FN: {}'.format(FN))
     print('TN: {}'.format(TN))
 
-    if hasattr(clf, 'decision_function'):
-        visualize.plot_roc_curve(clf, x_test, y_test)
-    else:
-        print('Classifier does not have decision function')
 
+def classify(x, y, kfold, smote, classifier='logistic'):
+    fitted_classifiers = []
+    set_x_train, set_x_test, set_y_train, set_y_test = split_dataset(x, y, kfold, smote)
+    for x_train, x_test, y_train, y_test in zip(set_x_train, set_x_test, set_y_train, set_y_test):
+        if classifier == 'logistic':
+            clf = linear_model.LogisticRegression(C=1e5)
+        elif classifier == 'random_forest':
+            clf = RandomForestClassifier(random_state=0)
+        elif classifier == 'svm':
+            clf = svm.SVC()
+        elif classifier == 'knn':
+            clf = neighbors.KNeighborsClassifier(algorithm='kd_tree')
+        else:
+            raise ValueError('Classifier unknown')
 
-def logistic_regression(x, y, kfold, smote):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
-        clf = linear_model.LogisticRegression(C=1e5)
         clf.fit(x_train, y_train)
-
         cross_validate(clf, x_test, y_test)
+        fitted_classifiers.append(clf)
 
-
-def random_forest(x, y, kfold, smote):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
-        clf = RandomForestClassifier(random_state=0)
-        clf.fit(x_train, y_train)
-
-        cross_validate(clf, x_test, y_test)
-
-
-def support_vector_machine(x, y, kfold, smote):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
-        clf = svm.SVC()
-        clf.fit(x_train, y_train)
-
-        cross_validate(clf, x_test, y_test)
-
-
-def k_nearest_neighbour(x, y, kfold, smote):
-    for x_train, x_test, y_train, y_test in split_dataset(x, y, kfold, smote):
-        clf = neighbors.KNeighborsClassifier(algorithm='kd_tree')
-        clf.fit(x_train, y_train)
-
-        cross_validate(clf, x_test, y_test)
-
-        metrics = pd.DataFrame(index=['accuracy', 'precision', 'recall'], columns=['NULL', 'LogisticReg'])
+    visualize.plot_roc_curve(fitted_classifiers, set_x_test, set_y_test)
 
 
 if __name__ == '__main__':
     data, categorical_sets = load_data()
-    pprint(categorical_sets)
+    # pprint(categorical_sets)
     postprocessed_data = postprocess_data(data)
 
     #################
     # Visualize task
     #################
-    # visualize.fraud_per_feature_category(postprocessed_data) # was een test
-    visualize.plot_visualizations(pd.DataFrame.from_records(postprocessed_data))
+    visualize.fraud_per_feature_category(postprocessed_data)  # was een test
+    # visualize.plot_visualizations(pd.DataFrame.from_records(postprocessed_data))
 
     #################
     # Imbalance task
     #################
     features, labels = create_x_y_sets(postprocessed_data, categorical_sets)
-    logistic_regression(features, labels, kfold=False, smote=False)
+    classify(features, labels, kfold=False, smote=False, classifier='logistic')
     # random_forest(features, labels, kfold=False, smote=False)
     # support_vector_machine(features, labels, kfold=False, smote=False)
 
@@ -265,7 +264,7 @@ if __name__ == '__main__':
     # Classification task
     ######################
     # Blackbox
-    logistic_regression(features, labels, kfold=True, smote=True)
+    classify(features, labels, kfold=True, smote=True, classifier='logistic')
 
     # Whitebox
     # random_forest(features, labels, kfold=True, smote=False)

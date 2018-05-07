@@ -1,8 +1,10 @@
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy import interp
 # from imblearn.over_sampling import over_sampling
 # from imblearn.over_sampling import UnderSampler
 # from imblearn.over_sampling import UnbalancedDataset
@@ -136,22 +138,37 @@ def plot_visualizations(dataframe: pd.DataFrame):
     return dataframe
 
 
-def plot_roc_curve(clf, x_test, y_test):
+def plot_roc_curve(fitted_classifiers: list, set_x_test: list, set_y_test: list):
     # TODO: Add ability to plot multiple folds in same roc curve
     # http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html
 
-    y_score = clf.decision_function(x_test)
+    tprs = []
+    aucs = []
+    mean_fpr = np.linspace(0, 1, 100)
+    i = 0
+    for clf, x_test, y_test in zip(fitted_classifiers, set_x_test, set_y_test):
+        y_score = clf.predict_proba(x_test)
 
-    fpr, tpr, _ = roc_curve(y_test, y_score)
-    roc_auc = auc(fpr, tpr)
+        fpr, tpr, thresholds = roc_curve(y_test, y_score[:, 1])
+        tprs.append(interp(mean_fpr, fpr, tpr))
+        tprs[-1][0] = 0.0
+        roc_auc = auc(fpr, tpr)
+        aucs.append(roc_auc)
+        plt.plot(fpr, tpr, lw=1, alpha=0.3,
+                 label='ROC fold %d (AUC = %0.2f)' % (i, roc_auc))
+        i += 1
 
-    plt.figure()
-    lw = 2
-    plt.plot(fpr, tpr, color='darkorange',
-             lw=lw, label='ROC curve (area = {})'.format(roc_auc))
-    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+    plt.plot(mean_fpr, mean_tpr, color='b',
+             label=r'Mean ROC (AUC = %0.2f $\pm$ %0.2f)' % (mean_auc, std_auc),
+             lw=2, alpha=.8)
+
+    # Diagonal
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-0.05, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('Receiver operating characteristic example')
