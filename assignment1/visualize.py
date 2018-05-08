@@ -138,8 +138,46 @@ def plot_visualizations(dataframe: pd.DataFrame):
     return dataframe
 
 
-def plot_roc_curve(fitted_classifiers: list, set_x_test: list, set_y_test: list):
-    # TODO: Add ability to plot multiple folds in same roc curve
+def plot_roc_curve_compare(curves: list, title='Comparison of mean ROC curves'):
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    for idx, curve in enumerate(curves):
+        fitted_classifiers = curve[0]
+        set_x_test = curve[1]
+        set_y_test = curve[2]
+        label = curve[3]
+
+        tprs = []
+        aucs = []
+        mean_fpr = np.linspace(0, 1, 100)
+        for clf, x_test, y_test in zip(fitted_classifiers, set_x_test, set_y_test):
+            y_score = clf.predict_proba(x_test)
+
+            fpr, tpr, thresholds = roc_curve(y_test, y_score[:, 1])
+            tprs.append(interp(mean_fpr, fpr, tpr))
+            tprs[-1][0] = 0.0
+            roc_auc = auc(fpr, tpr)
+            aucs.append(roc_auc)
+
+        mean_tpr = np.mean(tprs, axis=0)
+        mean_tpr[-1] = 1.0
+        mean_auc = auc(mean_fpr, mean_tpr)
+        std_auc = np.std(aucs)
+        plt.plot(mean_fpr, mean_tpr, color=colors[idx],
+                 label=r'%s Mean ROC (AUC = %0.2f $\pm$ %0.2f)' % (label, mean_auc, std_auc),
+                 lw=2, alpha=.8)
+
+    # Diagonal
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-0.05, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
+    plt.legend(loc="lower right")
+    plt.show()
+    plt.savefig('{}.jpg'.format('_'.join(title.split(' '))))
+
+
+def plot_roc_curve_kfold(fitted_classifiers: list, set_x_test: list, set_y_test: list, title='K fold ROC'):
     # http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc_crossval.html
 
     tprs = []
@@ -171,6 +209,6 @@ def plot_roc_curve(fitted_classifiers: list, set_x_test: list, set_y_test: list)
     plt.ylim([-0.05, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('Receiver operating characteristic example')
+    plt.title(title)
     plt.legend(loc="lower right")
     plt.show()

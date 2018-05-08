@@ -23,7 +23,10 @@ def nonnr_to_nr(categorical_set, element):
     """
     String data values need to be converted to numerical value
     """
-    return list(categorical_set).index(element)
+    if element == -1:  # Missing value substituted
+        return element
+    else:
+        return list(categorical_set).index(element)
 
 
 # TODO: ik begrijp niet wat dit moet doen

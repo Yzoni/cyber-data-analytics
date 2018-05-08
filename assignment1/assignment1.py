@@ -202,7 +202,7 @@ def split_dataset(x, y, kfold, smote, **kwargs):
         for train_index, test_index in kf.split(x):
             x_train, x_test, y_train, y_test = x[train_index], x[test_index], y[train_index], y[test_index]
             if smote:
-                x_train, y_train = SMOTE(**kwargs).fit_sample(x[train_index], y[train_index])
+                x_train, y_train = SMOTE(random_state=1, n_jobs=4, **kwargs).fit_sample(x[train_index], y[train_index])
 
             set_x_train.append(x_train)
             set_x_test.append(x_test)
@@ -242,9 +242,9 @@ def cross_validate(clf, x_test, y_test):
     print('TN: {}'.format(TN))
 
 
-def classify(x, y, kfold, smote, classifier='logistic'):
+def classify(x, y, kfold, smote, classifier='logistic', **kwargs):
     fitted_classifiers = []
-    set_x_train, set_x_test, set_y_train, set_y_test = split_dataset(x, y, kfold, smote)
+    set_x_train, set_x_test, set_y_train, set_y_test = split_dataset(x, y, kfold, smote, **kwargs)
     for x_train, x_test, y_train, y_test in zip(set_x_train, set_x_test, set_y_train, set_y_test):
         if classifier == 'logistic':
             clf = linear_model.LogisticRegression()
@@ -261,7 +261,38 @@ def classify(x, y, kfold, smote, classifier='logistic'):
         cross_validate(clf, x_test, y_test)
         fitted_classifiers.append(clf)
 
-    visualize.plot_roc_curve(fitted_classifiers, set_x_test, set_y_test)
+    return fitted_classifiers, set_x_test, set_y_test
+
+
+def find_best_smote_parameters(features, labels):
+    visualize.plot_roc_curve_compare(
+        [(*classify(features, labels, kfold=10, smote=True, classifier='logistic', k_neighbors=5),
+          'k_neighbors=5'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic', k_neighbors=10),
+          'k_neighbors=10'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic', k_neighbors=15),
+          'k_neighbors=15')],
+        title='SMOTE compare "k_neighbours"')
+
+    visualize.plot_roc_curve_compare(
+        [(*classify(features, labels, kfold=10, smote=True, classifier='logistic', kind='regular'),
+          'regular'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic', kind='borderline1'),
+          'borderline1'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic', kind='borderline2'),
+          'borderline2'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic', kind='svm'),
+          'svm')],
+        title='SMOTE compare "kind"')
+
+    visualize.plot_roc_curve_compare(
+        [(*classify(features, labels, kfold=10, smote=True, classifier='logistic', m_neighbors=10),
+          'm_neighbors=10'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic', m_neighbors=20),
+          'm_neighbors=20'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic', m_neighbors=30),
+          'm_neighbors=30')],
+        title='SMOTE compare "m_neighbors"')
 
 
 if __name__ == '__main__':
@@ -276,16 +307,25 @@ if __name__ == '__main__':
     #################
     # Imbalance task
     #################
+    # find_best_smote_parameters(data, categorical_sets)
+
     features, labels = create_x_y_sets(data, categorical_sets)
-    classify(features, labels, kfold=10, smote=True, classifier='logistic')
+
+    visualize.plot_roc_curve_compare(
+        [(*classify(features, labels, kfold=10, smote=False, classifier='logistic'), 'UNsmoted'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='logistic'), 'Smoted')])
+    # visualize.plot_roc_curve_compare(
+    #     [(*classify(features, labels, kfold=10, smote=False, classifier='svm'), 'UNsmoted'),
+    #      (*classify(features, labels, kfold=10, smote=True, classifier='svm'), 'Smoted')])
     # random_forest(features, labels, kfold=False, smote=False)
-    # support_vector_machine(features, labels, kfold=False, smote=False)
 
     ######################
     # Classification task
     ######################
     # Blackbox
-    # classify(features, labels, kfold=True, smote=True, classifier='logistic')
+    # fitted_classifiers, set_x_test, set_y_test = classify(features, labels, kfold=True, smote=True,
+    #                                                       classifier='logistic')
+    # visualize.plot_roc_curve(fitted_classifiers, set_x_test, set_y_test)
 
     # Whitebox
     # random_forest(features, labels, kfold=True, smote=False)
