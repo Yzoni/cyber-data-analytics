@@ -57,6 +57,9 @@ def load_data():
         data = []
         for row in reader:
 
+            if row['simple_journal'] == 'Refused':  # Skip refused rows because of uncertainty of status
+                continue
+
             data_row = {
                 'id': row['txid'],
                 'booking_date': datetime.strptime(row['bookingdate'], '%Y-%m-%d %H:%M:%S'),
@@ -90,7 +93,7 @@ def load_data():
         return data, categorical_sets
 
 
-def handle_missing_data(data: list, show=False):
+def handle_missing_data(data: list, show=False, missing_data_strategy='remove_row'):
     """
     missing_data_count_per_column = {'issuer_country': 493, # feature name: total number missing
                                      'issuer_id': 140,
@@ -122,9 +125,14 @@ def handle_missing_data(data: list, show=False):
         pprint(missing_data_count_per_column)
         pprint(missing_data_row_idxs)
 
-    # TODO: actually handle missing instead of just deleting and also handle "Refused" status
-    for idx in sorted(list(missing_data_row_idxs.keys()), reverse=True):
-        del data[idx]
+    # Handle not available data
+    if missing_data_strategy == 'remove_row':
+        for idx in sorted(list(missing_data_row_idxs.keys()), reverse=True):
+            del data[idx]
+    elif missing_data_strategy == 'new_category':
+        for k, v in missing_data_row_idxs.items():
+            for column in v:
+                data[k][column] = -1
 
     return data
 
@@ -159,8 +167,13 @@ def create_x_y_sets(data: list, categorical_sets: dict):
     features = []
     labels = []
     for row in data:
-        features.append([row[x] if x not in DISCRETE_STRING_FEATURES else util.nonnr_to_nr(categorical_sets[x], row[x])
-                         for x in selected_features])
+        feature = []
+        for x in selected_features:
+            if x not in DISCRETE_STRING_FEATURES:
+                feature.append(row[x])
+            else:
+                feature.append(util.nonnr_to_nr(categorical_sets[x], row[x]))
+        features.append(feature)
         labels.append(row['fraud'])
 
     return np.array(features).astype(float), np.array(labels).astype(float)
@@ -176,8 +189,6 @@ def split_dataset(x, y, kfold, smote, **kwargs):
     set_y_train = []
     set_y_test = []
 
-    # TODO create 2 * 10 splits with given percentage fraud cases for each training set
-    # TODO or make sure fraud cases are equally distributed over training set
     if kfold:
         kf = KFold(n_splits=10, shuffle=True)
         for train_index, test_index in kf.split(x):
