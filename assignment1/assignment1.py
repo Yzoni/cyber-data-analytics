@@ -154,8 +154,8 @@ def create_x_y_sets(data: list, categorical_sets: dict):
     """
 
     # The features that need to be selected for the feature matrix
-    selected_features = ['issuer_country', 'issuer_id', 'amount', 'currency', 'shopper_country',
-                         'shopper_interaction', 'verification', 'cvc_response', 'account_code']
+    selected_features = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
+                         'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
     features = []
     labels = []
     for row in data:
@@ -179,7 +179,7 @@ def split_dataset(x, y, kfold, smote, **kwargs):
     # TODO create 2 * 10 splits with given percentage fraud cases for each training set
     # TODO or make sure fraud cases are equally distributed over training set
     if kfold:
-        kf = KFold(n_splits=10)
+        kf = KFold(n_splits=10, shuffle=True)
         for train_index, test_index in kf.split(x):
             x_train, x_test, y_train, y_test = x[train_index], x[test_index], y[train_index], y[test_index]
             if smote:
@@ -247,7 +247,6 @@ def classify(x, y, kfold, smote, classifier='logistic'):
 
 if __name__ == '__main__':
     data, categorical_sets = load_data()
-    pprint(categorical_sets)
     postprocessed_data = postprocess_data(data)
 
     #################
