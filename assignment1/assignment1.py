@@ -83,6 +83,10 @@ def load_data():
 
             data.append(data_row)
 
+        # Create ordered list from unordered set
+        for category in categorical_sets:
+            categorical_sets[category] = list(categorical_sets[category])
+
         return data, categorical_sets
 
 
@@ -224,9 +228,9 @@ def classify(x, y, kfold, smote, classifier='logistic'):
     set_x_train, set_x_test, set_y_train, set_y_test = split_dataset(x, y, kfold, smote)
     for x_train, x_test, y_train, y_test in zip(set_x_train, set_x_test, set_y_train, set_y_test):
         if classifier == 'logistic':
-            clf = linear_model.LogisticRegression(C=1e5)
+            clf = linear_model.LogisticRegression()
         elif classifier == 'random_forest':
-            clf = RandomForestClassifier(random_state=0)
+            clf = RandomForestClassifier()
         elif classifier == 'svm':
             clf = svm.SVC()
         elif classifier == 'knn':
@@ -243,20 +247,20 @@ def classify(x, y, kfold, smote, classifier='logistic'):
 
 if __name__ == '__main__':
     data, categorical_sets = load_data()
-    # pprint(categorical_sets)
+    pprint(categorical_sets)
     postprocessed_data = postprocess_data(data)
 
     #################
     # Visualize task
     #################
-    visualize.fraud_per_feature_category(postprocessed_data)  # was een test
+    # visualize.fraud_per_feature_category(postprocessed_data)  # was een test
     # visualize.plot_visualizations(pd.DataFrame.from_records(postprocessed_data))
 
     #################
     # Imbalance task
     #################
     features, labels = create_x_y_sets(postprocessed_data, categorical_sets)
-    classify(features, labels, kfold=False, smote=False, classifier='logistic')
+    classify(features, labels, kfold=10, smote=True, classifier='logistic')
     # random_forest(features, labels, kfold=False, smote=False)
     # support_vector_machine(features, labels, kfold=False, smote=False)
 
@@ -264,7 +268,7 @@ if __name__ == '__main__':
     # Classification task
     ######################
     # Blackbox
-    classify(features, labels, kfold=True, smote=True, classifier='logistic')
+    # classify(features, labels, kfold=True, smote=True, classifier='logistic')
 
     # Whitebox
     # random_forest(features, labels, kfold=True, smote=False)
