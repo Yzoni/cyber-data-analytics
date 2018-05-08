@@ -2,14 +2,11 @@ import csv
 from collections import defaultdict
 from datetime import datetime
 from pprint import pprint
+import pickle
 
 import numpy as np
-import pandas as pd
-# from imblearn.over_sampling import over_sampling
 from imblearn.over_sampling import SMOTE
 from sklearn import svm, neighbors, linear_model
-# from imblearn.over_sampling import UnderSampler
-# from imblearn.over_sampling import UnbalancedDataset
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
@@ -22,7 +19,7 @@ DISCRETE_STRING_FEATURES = ['issuer_country', 'tx_variant', 'currency', 'shopper
                             'verification', 'account_code']
 
 
-def load_data():
+def load_data(postprocess=True, use_cached=True):
     """
     Reads the raw csv data into a list of dictionaries
 
@@ -48,6 +45,11 @@ def load_data():
       - 'shopper_interaction': {'Ecommerce'}, # For each key list all possible values
         'tx_variant': {'cirrus', 'electron', ...
     """
+
+    if use_cached:
+        with open('data.pickle', 'rb') as handle:
+            print('Loading data from cache...')
+            return pickle.load(handle)
 
     with open('data_for_student_case.csv') as csv_file:
         reader = csv.DictReader(csv_file)
@@ -89,6 +91,12 @@ def load_data():
         # Create ordered list from unordered set
         for category in categorical_sets:
             categorical_sets[category] = list(categorical_sets[category])
+
+        if postprocess:
+            postprocess_data(data)
+
+        with open('data.pickle', 'wb') as handle:
+            pickle.dump((data, categorical_sets), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return data, categorical_sets
 
@@ -257,8 +265,7 @@ def classify(x, y, kfold, smote, classifier='logistic'):
 
 
 if __name__ == '__main__':
-    data, categorical_sets = load_data()
-    postprocessed_data = postprocess_data(data)
+    data, categorical_sets = load_data(use_cached=True)
 
     #################
     # Visualize task
@@ -269,7 +276,7 @@ if __name__ == '__main__':
     #################
     # Imbalance task
     #################
-    features, labels = create_x_y_sets(postprocessed_data, categorical_sets)
+    features, labels = create_x_y_sets(data, categorical_sets)
     classify(features, labels, kfold=10, smote=True, classifier='logistic')
     # random_forest(features, labels, kfold=False, smote=False)
     # support_vector_machine(features, labels, kfold=False, smote=False)
