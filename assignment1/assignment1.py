@@ -47,9 +47,12 @@ def load_data(postprocess=True, use_cached=True):
     """
 
     if use_cached:
-        with open('data.pickle', 'rb') as handle:
-            print('Loading data from cache...')
-            return pickle.load(handle)
+        try:
+            with open('data.pickle', 'rb') as handle:
+                print('Loading data from cache...')
+                return pickle.load(handle)
+        except FileNotFoundError:
+            pass
 
     with open('data_for_student_case.csv') as csv_file:
         reader = csv.DictReader(csv_file)
@@ -63,7 +66,7 @@ def load_data(postprocess=True, use_cached=True):
                 continue
 
             data_row = {
-                'id': row['txid'],
+                'id': int(row['txid']),
                 'booking_date': datetime.strptime(row['bookingdate'], '%Y-%m-%d %H:%M:%S'),
                 'issuer_country': row['issuercountrycode'] if row['issuercountrycode'] != 'NA' else None,
                 'tx_variant': row['txvariantcode'],
@@ -72,10 +75,10 @@ def load_data(postprocess=True, use_cached=True):
                 'currency': row['currencycode'],
                 'shopper_country': row['shoppercountrycode'] if row['shoppercountrycode'] != 'NA' else None,
                 'shopper_interaction': row['shopperinteraction'],
-                'fraud': 1 if row['simple_journal'] == 'Chargeback' else 0,  # TODO: SEE handle_missing_data()
+                'fraud': 1 if row['simple_journal'] == 'Chargeback' else 0,
                 'verification': row['cardverificationcodesupplied'] if row[
                                                                            'cardverificationcodesupplied'] != 'NA' else None,
-                'cvc_response': 3 if int(row['cvcresponsecode']) > 2 else row['cvcresponsecode'],
+                'cvc_response': 0 if int(row['cvcresponsecode']) > 2 else int(row['cvcresponsecode']),
                 'creation_date': datetime.strptime(row['creationdate'], '%Y-%m-%d %H:%M:%S'),
                 'account_code': row['accountcode'],
                 'mail_id': row['mail_id'], 'ip': row['ip_id'],
@@ -124,6 +127,7 @@ def handle_missing_data(data: list, show=False, missing_data_strategy='remove_ro
     missing_data_row_idxs = defaultdict(list)
 
     for row_index, row in enumerate(data):
+
         for key, value in row.items():
             if value is None:
                 missing_data_count_per_column[key] += 1
@@ -296,24 +300,24 @@ def find_best_smote_parameters(features, labels):
 
 
 if __name__ == '__main__':
-    data, categorical_sets = load_data(use_cached=True)
+    data, categorical_sets = load_data(use_cached=False)
 
     #################
     # Visualize task
     #################
-    # visualize.fraud_per_feature_category(postprocessed_data)  # was een test
+    visualize.fraud_per_feature_category(data)  # was een test
     # visualize.plot_visualizations(pd.DataFrame.from_records(postprocessed_data))
 
     #################
     # Imbalance task
     #################
-    # find_best_smote_parameters(data, categorical_sets)
-
     features, labels = create_x_y_sets(data, categorical_sets)
 
-    visualize.plot_roc_curve_compare(
-        [(*classify(features, labels, kfold=10, smote=False, classifier='logistic'), 'UNsmoted'),
-         (*classify(features, labels, kfold=10, smote=True, classifier='logistic'), 'Smoted')])
+    find_best_smote_parameters(features, labels)
+
+    # visualize.plot_roc_curve_compare(
+    #     [(*classify(features, labels, kfold=10, smote=False, classifier='logistic'), 'UNsmoted'),
+    #      (*classify(features, labels, kfold=10, smote=True, classifier='logistic'), 'Smoted')])
     # visualize.plot_roc_curve_compare(
     #     [(*classify(features, labels, kfold=10, smote=False, classifier='svm'), 'UNsmoted'),
     #      (*classify(features, labels, kfold=10, smote=True, classifier='svm'), 'Smoted')])
