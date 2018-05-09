@@ -313,7 +313,7 @@ if __name__ == '__main__':
     #################
     features, labels = create_x_y_sets(data, categorical_sets)
 
-    find_best_smote_parameters(features, labels)
+    # find_best_smote_parameters(features, labels)
 
     # visualize.plot_roc_curve_compare(
     #     [(*classify(features, labels, kfold=10, smote=False, classifier='logistic'), 'UNsmoted'),
@@ -321,7 +321,9 @@ if __name__ == '__main__':
     # visualize.plot_roc_curve_compare(
     #     [(*classify(features, labels, kfold=10, smote=False, classifier='svm'), 'UNsmoted'),
     #      (*classify(features, labels, kfold=10, smote=True, classifier='svm'), 'Smoted')])
-    # random_forest(features, labels, kfold=False, smote=False)
+    visualize.plot_roc_curve_compare(
+        [(*classify(features, labels, kfold=10, smote=False, classifier='random_forest'), 'UNsmoted'),
+         (*classify(features, labels, kfold=10, smote=True, classifier='random_forest'), 'Smoted')])
 
     ######################
     # Classification task
