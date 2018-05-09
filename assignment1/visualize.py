@@ -218,7 +218,8 @@ def plot_roc_curve_kfold(fitted_classifiers: list, set_x_test: list, set_y_test:
 
 def plot_decision_tree(clf, feature_names):
     export_graphviz(clf.estimators_[0],
-                    class_names=feature_names,
+                    feature_names=feature_names,
+                    class_names=['fraud','nonfraud'],
                     out_file='dotfile.dot',
                     filled=True,
                     rounded=True)
