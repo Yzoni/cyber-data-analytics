@@ -18,6 +18,10 @@ import util
 DISCRETE_STRING_FEATURES = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction',
                             'verification', 'account_code']
 
+# The features that need to be selected for the feature matrix
+SELECTED_FEATURES = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
+                     'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
+
 
 def load_data(postprocess=True, use_cached=True):
     """
@@ -173,14 +177,11 @@ def create_x_y_sets(data: list, categorical_sets: dict):
     Also converts non numerical features to a numeric value
     """
 
-    # The features that need to be selected for the feature matrix
-    selected_features = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
-                         'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
     features = []
     labels = []
     for row in data:
         feature = []
-        for x in selected_features:
+        for x in SELECTED_FEATURES:
             if x not in DISCRETE_STRING_FEATURES:
                 feature.append(row[x])
             else:
@@ -262,6 +263,7 @@ def classify(x, y, kfold, smote, classifier='logistic', **kwargs):
             raise ValueError('Classifier unknown')
 
         clf.fit(x_train, y_train)
+
         cross_validate(clf, x_test, y_test)
         fitted_classifiers.append(clf)
 
@@ -305,7 +307,7 @@ if __name__ == '__main__':
     #################
     # Visualize task
     #################
-    visualize.fraud_per_feature_category(data)  # was een test
+    # visualize.fraud_per_feature_category(data)  # was een test
     # visualize.plot_visualizations(pd.DataFrame.from_records(postprocessed_data))
 
     #################
@@ -321,9 +323,9 @@ if __name__ == '__main__':
     # visualize.plot_roc_curve_compare(
     #     [(*classify(features, labels, kfold=10, smote=False, classifier='svm'), 'UNsmoted'),
     #      (*classify(features, labels, kfold=10, smote=True, classifier='svm'), 'Smoted')])
-    visualize.plot_roc_curve_compare(
-        [(*classify(features, labels, kfold=10, smote=False, classifier='random_forest'), 'UNsmoted'),
-         (*classify(features, labels, kfold=10, smote=True, classifier='random_forest'), 'Smoted')])
+    # visualize.plot_roc_curve_compare(
+    #     [(*classify(features, labels, kfold=10, smote=False, classifier='random_forest'), 'UNsmoted'),
+    #      (*classify(features, labels, kfold=10, smote=True, classifier='random_forest'), 'Smoted')])
 
     ######################
     # Classification task
@@ -331,7 +333,11 @@ if __name__ == '__main__':
     # Blackbox
     # fitted_classifiers, set_x_test, set_y_test = classify(features, labels, kfold=True, smote=True,
     #                                                       classifier='logistic')
+
     # visualize.plot_roc_curve(fitted_classifiers, set_x_test, set_y_test)
 
     # Whitebox
-    # random_forest(features, labels, kfold=True, smote=False)
+    random_forest_fitted_classifiers, set_x_test, set_y_test = classify(features, labels, kfold=False, smote=False,
+                                                                        classifier='random_forest')
+
+    visualize.plot_decision_tree(random_forest_fitted_classifiers[0], SELECTED_FEATURES)

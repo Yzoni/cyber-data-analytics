@@ -11,6 +11,8 @@ from scipy import interp
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import classification_report, accuracy_score, roc_curve, auc
 from sklearn.neighbors import LocalOutlierFactor
+from sklearn.tree import export_graphviz
+from os import system
 
 
 def fraud_per_feature_category(data):
@@ -212,3 +214,12 @@ def plot_roc_curve_kfold(fitted_classifiers: list, set_x_test: list, set_y_test:
     plt.title(title)
     plt.legend(loc="lower right")
     plt.show()
+
+
+def plot_decision_tree(clf, feature_names):
+    export_graphviz(clf.estimators_[0],
+                    out_file='dotfile.dot',
+                    filled=True,
+                    rounded=True)
+
+    system('dot -Tpng dotfile.dot -o tree.png')
