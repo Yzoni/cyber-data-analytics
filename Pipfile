@@ -12,6 +12,7 @@ matplotlib = "*"
 pandas = "*"
 seaborn = "*"
 "progressbar2" = "*"
+python-dateutil = "*"
 
 [dev-packages]
 
