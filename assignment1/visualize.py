@@ -176,7 +176,7 @@ def plot_roc_curve_compare(curves: list, title='Comparison of mean ROC curves'):
     plt.title(title)
     plt.legend(loc="lower right")
     plt.show()
-    plt.savefig('{}.jpg'.format('_'.join(title.split(' '))))
+    plt.savefig('{}.png'.format('_'.join(title.split(' '))))
 
 
 def plot_roc_curve_kfold(fitted_classifiers: list, set_x_test: list, set_y_test: list, title='K fold ROC'):
@@ -214,6 +214,7 @@ def plot_roc_curve_kfold(fitted_classifiers: list, set_x_test: list, set_y_test:
     plt.title(title)
     plt.legend(loc="lower right")
     plt.show()
+    plt.savefig('{}.png'.format('_'.join(title.split(' '))))
 
 
 def plot_decision_tree(clf, feature_names):

@@ -3,11 +3,11 @@ from dateutil.relativedelta import relativedelta
 
 from assignment1 import load_data
 import progressbar
-from multiprocessing import Pool, Process
+from multiprocessing import Process
 
 
-def create(data: list):
-    conn = sqlite3.connect(':memory:')
+def create(data: list, location=':memory:'):
+    conn = sqlite3.connect(location)
 
     c = conn.cursor()
     c.execute('''CREATE TABLE transactions
@@ -34,7 +34,7 @@ def txn_amount_over_month(data: list):
 
     with open('average_daily_over_month.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(months=-1)
+            begin = row['creation_date'] + relativedelta(days=-30)
             c = conn.cursor()
             c.execute(
                 '''SELECT amount FROM transactions WHERE card_id = ? AND creation_date BETWEEN date(?) AND date(?)''',
@@ -54,11 +54,11 @@ def average_daily_over_month(data: list):
 
     with open('average_daily_over_month.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(months=-1)
+            creation_date = row['creation_date'].replace(hour=0, minute=0, second=0)
             c = conn.cursor()
             c.execute(
                 '''SELECT amount FROM transactions WHERE card_id = ? AND account_code = ? AND creation_date BETWEEN date(?) AND date(?)''',
-                (row['card_id'], row['account_code'], begin, row['creation_date']))
+                (row['card_id'], row['account_code'], creation_date, creation_date + relativedelta(days=+1)))
             transactions = c.fetchall()
             f.write('{}\n'.format(sum([amount[0] for amount in transactions]) / 30))
 
@@ -74,11 +74,12 @@ def amount_same_day(data: list):
 
     with open('amount_same_day.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(days=-1)
+            start_of_day_creation_date = row['creation_date'].replace(hour=0, minute=0, second=0)
+
             c = conn.cursor()
             c.execute(
                 '''SELECT amount FROM transactions WHERE card_id = ? AND creation_date BETWEEN date(?) AND date(?)''',
-                (row['card_id'], begin, row['creation_date']))
+                (row['card_id'], start_of_day_creation_date, row['creation_date']))
             transactions = c.fetchall()
             f.write('{}\n'.format(sum([amount[0] for amount in transactions])))
 
@@ -94,11 +95,12 @@ def number_same_day(data: list):
 
     with open('number_same_day.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(days=-1)
+            start_of_day_creation_date = row['creation_date'].replace(hour=0, minute=0, second=0)
+
             c = conn.cursor()
             c.execute(
                 '''SELECT COUNT(*) FROM transactions WHERE card_id = ? AND creation_date BETWEEN date(?) AND date(?)''',
-                (row['card_id'], begin, row['creation_date']))
+                (row['card_id'], start_of_day_creation_date, row['creation_date']))
             transactions = c.fetchone()
             f.write('{}\n'.format(sum([count[0] for count in transactions])))
 
@@ -106,15 +108,16 @@ def number_same_day(data: list):
     conn.close()
 
 
-def amount_same_merchant_month(data: list):
+def average_amount_same_merchant_month(data: list):
     conn = create(data)
 
-    print('amount_same_merchant_month')
+    print('average_amount_same_merchant_month')
     bar = progressbar.ProgressBar(max_value=len(data))
 
-    with open('number_same_day.csv', mode='w') as f:
+    with open('average_amount_same_merchant_month.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(days=-1)
+            begin = row['creation_date'] + relativedelta(days=-30)
+
             c = conn.cursor()
             c.execute(
                 '''SELECT amount FROM transactions WHERE account_code = ? AND creation_date BETWEEN date(?) AND date(?)''',
@@ -145,7 +148,7 @@ def number_same_merchant_month(data: list):
     conn.close()
 
 
-def amount_same_currency_month(data: list):
+def average_amount_same_currency_month(data: list):
     conn = create(data)
 
     print('amount_same_currency_month')
@@ -153,7 +156,7 @@ def amount_same_currency_month(data: list):
 
     with open('amount_same_currency_month.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(months=-1)
+            begin = row['creation_date'] + relativedelta(days=-30)
             c = conn.cursor()
             c.execute(
                 '''SELECT amount FROM transactions WHERE currency = ? AND creation_date BETWEEN date(?) AND date(?)''',
@@ -173,7 +176,7 @@ def number_same_currency_month(data: list):
 
     with open('number_same_currency_month.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(months=-1)
+            begin = row['creation_date'] + relativedelta(days=-30)
             c = conn.cursor()
             c.execute(
                 '''SELECT COUNT(*) FROM transactions WHERE currency = ? AND creation_date BETWEEN date(?) AND date(?)''',
@@ -185,7 +188,7 @@ def number_same_currency_month(data: list):
     conn.close()
 
 
-def amount_same_shopper_country_month(data: list):
+def average_amount_same_shopper_country_month(data: list):
     conn = create(data)
 
     print('amount_same_shopper_country_month')
@@ -193,7 +196,7 @@ def amount_same_shopper_country_month(data: list):
 
     with open('amount_same_shopper_country_month.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(months=-1)
+            begin = row['creation_date'] + relativedelta(days=-30)
             c = conn.cursor()
             c.execute(
                 '''SELECT amount FROM transactions WHERE shopper_country = ? AND creation_date BETWEEN date(?) AND date(?)''',
@@ -202,6 +205,7 @@ def amount_same_shopper_country_month(data: list):
             f.write('{}\n'.format(sum([amount[0] for amount in transactions]) / 30))
 
             bar.update(idx)
+    conn.close()
 
 
 def number_same_shopper_country_month(data: list):
@@ -212,7 +216,7 @@ def number_same_shopper_country_month(data: list):
 
     with open('number_same_shopper_country_month.csv', mode='w') as f:
         for idx, row in enumerate(data):
-            begin = row['creation_date'] + relativedelta(months=-1)
+            begin = row['creation_date'] + relativedelta(days=-30)
             c = conn.cursor()
             c.execute(
                 '''SELECT COUNT(*) FROM transactions WHERE shopper_country = ? AND creation_date BETWEEN date(?) AND date(?)''',
@@ -241,11 +245,11 @@ def create_all(data: list):
 
     p1 = Process(target=number_same_day, args=(data,))
     p1.start()
-    p2 = Process(target=amount_same_merchant_month, args=(data,))
+    p2 = Process(target=average_amount_same_merchant_month, args=(data,))
     p2.start()
     p3 = Process(target=number_same_merchant_month, args=(data,))
     p3.start()
-    p4 = Process(target=amount_same_currency_month, args=(data,))
+    p4 = Process(target=average_amount_same_currency_month, args=(data,))
     p4.start()
 
     p1.join()
@@ -255,7 +259,7 @@ def create_all(data: list):
 
     p1 = Process(target=number_same_currency_month, args=(data,))
     p1.start()
-    p2 = Process(target=amount_same_shopper_country_month, args=(data,))
+    p2 = Process(target=average_amount_same_shopper_country_month, args=(data,))
     p2.start()
     p3 = Process(target=number_same_shopper_country_month, args=(data,))
     p3.start()
