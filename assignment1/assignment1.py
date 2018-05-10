@@ -10,6 +10,9 @@ from sklearn import svm, neighbors, linear_model
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
+import currency_converter
+import os
+from pathlib import Path
 
 import visualize
 import util
@@ -21,6 +24,8 @@ DISCRETE_STRING_FEATURES = ['issuer_country', 'tx_variant', 'currency', 'shopper
 # The features that need to be selected for the feature matrix
 SELECTED_FEATURES = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
                      'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
+
+ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load_data(postprocess=True, use_cached=True):
@@ -52,13 +57,13 @@ def load_data(postprocess=True, use_cached=True):
 
     if use_cached:
         try:
-            with open('data.pickle', 'rb') as handle:
+            with (ROOT / 'data.pickle').open('rb') as handle:
                 print('Loading data from cache...')
                 return pickle.load(handle)
         except FileNotFoundError:
             pass
 
-    with open('data_for_student_case.csv') as csv_file:
+    with (ROOT / 'data_for_student_case.csv').open(mode='r') as csv_file:
         reader = csv.DictReader(csv_file)
 
         categorical_sets = {key: set() for key in DISCRETE_STRING_FEATURES}
@@ -102,7 +107,7 @@ def load_data(postprocess=True, use_cached=True):
         if postprocess:
             postprocess_data(data)
 
-        with open('data.pickle', 'wb') as handle:
+        with (ROOT / 'data.pickle').open(mode='wb') as handle:
             pickle.dump((data, categorical_sets), handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return data, categorical_sets
@@ -162,11 +167,12 @@ def postprocess_data(data: list):
     data = handle_missing_data(data)
 
     # Normalize currency value in place
-    currency_dict = {'SEK': 0.01 * 0.11, 'MXN': 0.01 * 0.05, 'AUD': 0.01 * 0.67, 'NZD': 0.01 * 0.61,
-                     'GBP': 1.28 * 0.01}  # TODO are this all the currencies?
+    c = currency_converter.CurrencyConverter('http://www.ecb.int/stats/eurofxref/eurofxref-hist.zip')
     for row in data:
-        row['amount'] = currency_dict[row['currency']] * row['amount']
-
+        try:
+            row['amount'] = c.convert(row['amount'], row['currency'], 'EUR', date=row['creation_date'])
+        except currency_converter.RateNotFoundError:
+            row['amount'] = c.convert(row['amount'], row['currency'], 'EUR')
     return data
 
 

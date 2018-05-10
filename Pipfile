@@ -13,6 +13,7 @@ pandas = "*"
 seaborn = "*"
 "progressbar2" = "*"
 python-dateutil = "*"
+currencyconverter = "*"
 
 [dev-packages]
 
