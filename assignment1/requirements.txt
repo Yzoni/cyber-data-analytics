@@ -1,0 +1,8 @@
+progressbar2
+pandas
+numpy
+matplotlib
+seaborn
+CurrencyConverter
+sklearn
+scikit-learn

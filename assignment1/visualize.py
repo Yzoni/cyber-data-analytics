@@ -1,18 +1,13 @@
 from collections import defaultdict
+from os import system
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import interp
-# from imblearn.over_sampling import over_sampling
-# from imblearn.over_sampling import UnderSampler
-# from imblearn.over_sampling import UnbalancedDataset
-from sklearn.ensemble import IsolationForest
-from sklearn.metrics import classification_report, accuracy_score, roc_curve, auc
-from sklearn.neighbors import LocalOutlierFactor
+from sklearn.metrics import roc_curve, auc
 from sklearn.tree import export_graphviz
-from os import system
 
 
 def fraud_per_feature_category(data):
@@ -70,7 +65,7 @@ def print_fraud_counts(data: list):
             fraud += 1
         else:
             nonfraud += 1
-    print('Fraud transactins: {}'.format(fraud))
+    print('Fraud transactions: {}'.format(fraud))
     print('Non fraud transactions: {}'.format(nonfraud))
     print('Ratio: {}'.format(fraud / nonfraud))
 

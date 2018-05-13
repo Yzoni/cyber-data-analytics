@@ -10,6 +10,9 @@ from sklearn import svm, neighbors, linear_model
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import GradientBoostingRegressor
+
 import currency_converter
 import os
 from pathlib import Path
@@ -299,25 +302,36 @@ def classify(x, y, kfold, smote, classifier='logistic', **kwargs):
     TP_total, FP_total, FN_total, TN_total = 0, 0, 0, 0
     fold_n = 1
 
+    print('------ Classifier')
+    print(classifier)
+    print('------ Classifier')
+
     fitted_classifiers = []
     set_x_train, set_x_test, set_y_train, set_y_test = split_dataset(x, y, kfold, smote, **kwargs)
     for x_train, x_test, y_train, y_test in zip(set_x_train, set_x_test, set_y_train, set_y_test):
         if classifier == 'logistic':
-            clf = linear_model.LogisticRegression()
+            clf = linear_model.LogisticRegression(C=1)
         elif classifier == 'random_forest':
             clf = RandomForestClassifier(n_jobs=6)
         elif classifier == 'svm':
             clf = svm.LinearSVC()
         elif classifier == 'knn':
             clf = neighbors.KNeighborsClassifier(algorithm='kd_tree')
+        elif classifier == 'mlp':
+            clf = MLPClassifier(solver='lbfgs', alpha=1e-5,
+                                hidden_layer_sizes=(5, 2), random_state=1)
+        elif classifier == 'gboost':
+            clf = GradientBoostingRegressor()
         else:
             raise ValueError('Classifier unknown')
 
         clf.fit(x_train, y_train)
 
+        print('===========')
         print('Fold {}'.format(fold_n))
+        print('-----------')
         TP, FP, FN, TN = cross_validate(clf, x_test, y_test)
-        print('\n')
+        print('===========')
 
         TP_total += TP
         FP_total += FP
@@ -333,7 +347,6 @@ def classify(x, y, kfold, smote, classifier='logistic', **kwargs):
     print('FP: {}'.format(FP_total))
     print('FN: {}'.format(FN_total))
     print('TN: {}'.format(TN_total))
-
 
     return fitted_classifiers, set_x_test, set_y_test
 
@@ -415,12 +428,18 @@ if __name__ == '__main__':
     # Classification task
     ######################
     if args.blackbox:
-        selected_features = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
-                             'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
+        selected_features = ['verification', 'issuer_country', 'amount',  'shopper_country',
+                             'cvc_response', 'average_amount_same_merchant_month',
+                             'average_amount_same_shopper_country_month',
+                             'average_daily_month', 'number_same_currency_month', 'number_same_merchant_month',
+                             'number_same_shopper_country_month', 'number_same_day', 'amount_same_day',
+                             'country_differs']
+
         features, labels = create_x_y_sets(data, categorical_sets, selected_features)
 
         fitted_classifiers, set_x_test, set_y_test = classify(features, labels, kfold=True, smote=True,
                                                               classifier='logistic')
+
         visualize.plot_roc_curve_kfold(fitted_classifiers, set_x_test, set_y_test)
     if args.whitebox:
         selected_features = ['issuer_id', 'amount', 'shopper_interaction', 'verification',
