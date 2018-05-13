@@ -17,16 +17,34 @@ import argparse
 
 import visualize
 import util
+import generate_aggregated_features
+
+"""
+POSSIBLE FEATURES
+-----------------
+
+MERGED_FEATURES = [
+    'amount_same_currency_month', 'average_amount_same_merchant_month', 'average_amount_same_shopper_country_month',
+    'average_daily_month', 'number_same_currency_month', 'number_same_merchant_month',
+    'number_same_shopper_country_month', 'number_same_day', 'amount_same_day'
+]
+
+
+POST_FEATURES = [
+    'country_differs'
+]
+
+RAW_FEATURES = [
+    'issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country', 'ip', 'card_id',
+    'shopper_interaction', 'verification', 'cvc_response', 'tx_variant', 'mail_id'
+]
+"""
+
+ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # Constant describing the labels in the dataset that have a discrete value as string the raw data
 DISCRETE_STRING_FEATURES = ['issuer_country', 'tx_variant', 'currency', 'shopper_country', 'shopper_interaction',
                             'verification', 'account_code']
-
-# The features that need to be selected for the feature matrix
-SELECTED_FEATURES = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
-                     'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
-
-ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load_data(postprocess=True, use_cached=True):
@@ -174,21 +192,42 @@ def postprocess_data(data: list):
             row['amount'] = c.convert(row['amount'], row['currency'], 'EUR', date=row['creation_date'])
         except currency_converter.RateNotFoundError:
             row['amount'] = c.convert(row['amount'], row['currency'], 'EUR')
+
+    with open('merged.csv', mode='r') as csvfile:
+        merged_data = [row for row in csv.DictReader(csvfile, delimiter=',')]
+
+    for idx, row in enumerate(data):
+        merged_row = merged_data[idx]
+        for k, v in merged_row.items():
+            if k == 'id':
+                continue
+            row[k] = v
+
+    for row in data:
+        if row['issuer_country'] != row['shopper_country']:
+            row['country_differs'] = 1
+        else:
+            row['country_differs'] = 0
+
     return data
 
 
-def create_x_y_sets(data: list, categorical_sets: dict):
+def create_x_y_sets(data: list, categorical_sets: dict, selected_features: list):
     """
     Returns separate sets for the features and labels
 
     Also converts non numerical features to a numeric value
     """
 
+    print('------ Features')
+    print(selected_features)
+    print('------ Features')
+
     features = []
     labels = []
     for row in data:
         feature = []
-        for x in SELECTED_FEATURES:
+        for x in selected_features:
             if x not in DISCRETE_STRING_FEATURES:
                 feature.append(row[x])
             else:
@@ -253,17 +292,22 @@ def cross_validate(clf, x_test, y_test):
     print('FN: {}'.format(FN))
     print('TN: {}'.format(TN))
 
+    return TP, FP, FN, TN
+
 
 def classify(x, y, kfold, smote, classifier='logistic', **kwargs):
+    TP_total, FP_total, FN_total, TN_total = 0, 0, 0, 0
+    fold_n = 1
+
     fitted_classifiers = []
     set_x_train, set_x_test, set_y_train, set_y_test = split_dataset(x, y, kfold, smote, **kwargs)
     for x_train, x_test, y_train, y_test in zip(set_x_train, set_x_test, set_y_train, set_y_test):
         if classifier == 'logistic':
             clf = linear_model.LogisticRegression()
         elif classifier == 'random_forest':
-            clf = RandomForestClassifier()
+            clf = RandomForestClassifier(n_jobs=6)
         elif classifier == 'svm':
-            clf = svm.SVC()
+            clf = svm.LinearSVC()
         elif classifier == 'knn':
             clf = neighbors.KNeighborsClassifier(algorithm='kd_tree')
         else:
@@ -271,8 +315,25 @@ def classify(x, y, kfold, smote, classifier='logistic', **kwargs):
 
         clf.fit(x_train, y_train)
 
-        cross_validate(clf, x_test, y_test)
+        print('Fold {}'.format(fold_n))
+        TP, FP, FN, TN = cross_validate(clf, x_test, y_test)
+        print('\n')
+
+        TP_total += TP
+        FP_total += FP
+        FN_total += FN
+        TN_total += TN
+
         fitted_classifiers.append(clf)
+
+        fold_n += 1
+
+    print('----- Total:')
+    print('TP: {}'.format(TP_total))
+    print('FP: {}'.format(FP_total))
+    print('FN: {}'.format(FN_total))
+    print('TN: {}'.format(TN_total))
+
 
     return fitted_classifiers, set_x_test, set_y_test
 
@@ -319,22 +380,27 @@ if __name__ == '__main__':
                         help='Fit and cross validate black-box algorithm')
     parser.add_argument('--classify-whitebox', dest='whitebox', action='store_true',
                         help='Fit and cross validate white-box algorithm')
+    parser.add_argument('--create-derived-data', dest='derived_data', action='store_true',
+                        help='Generate derived data')
     args = parser.parse_args()
 
     data, categorical_sets = load_data(use_cached=False)
-    features, labels = create_x_y_sets(data, categorical_sets)
 
     #################
     # Visualize task
     #################
     if args.visualize:
         visualize.fraud_per_feature_category(data)
+        visualize.print_fraud_counts(data)
 
     #################
     # Imbalance task
     #################
     # experiment_smote_parameters(features, labels) # Experiment with SMOTE parameters
     if args.smote:
+        selected_features = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
+                             'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
+        features, labels = create_x_y_sets(data, categorical_sets, selected_features)
         visualize.plot_roc_curve_compare(
             [(*classify(features, labels, kfold=10, smote=False, classifier='logistic'), 'UNsmoted'),
              (*classify(features, labels, kfold=10, smote=True, classifier='logistic'), 'Smoted')])
@@ -349,11 +415,27 @@ if __name__ == '__main__':
     # Classification task
     ######################
     if args.blackbox:
+        selected_features = ['issuer_id', 'issuer_country', 'amount', 'currency', 'shopper_country',
+                             'shopper_interaction', 'verification', 'cvc_response', 'tx_variant']
+        features, labels = create_x_y_sets(data, categorical_sets, selected_features)
+
         fitted_classifiers, set_x_test, set_y_test = classify(features, labels, kfold=True, smote=True,
                                                               classifier='logistic')
-        visualize.plot_roc_curve(fitted_classifiers, set_x_test, set_y_test)
-
+        visualize.plot_roc_curve_kfold(fitted_classifiers, set_x_test, set_y_test)
     if args.whitebox:
-        random_forest_fitted_classifiers, set_x_test, set_y_test = classify(features, labels, kfold=False, smote=False,
+        selected_features = ['issuer_id', 'amount', 'shopper_interaction', 'verification',
+                             'cvc_response', 'tx_variant', 'number_same_currency_month', 'number_same_merchant_month',
+                             'number_same_shopper_country_month', 'number_same_day', 'amount_same_day',
+                             'country_differs']
+        features, labels = create_x_y_sets(data, categorical_sets, selected_features)
+
+        random_forest_fitted_classifiers, set_x_test, set_y_test = classify(features, labels, kfold=True, smote=True,
                                                                             classifier='random_forest')
-        visualize.plot_decision_tree(random_forest_fitted_classifiers[0], SELECTED_FEATURES)
+        visualize.plot_roc_curve_kfold(random_forest_fitted_classifiers, set_x_test, set_y_test)
+        # visualize.plot_decision_tree(random_forest_fitted_classifiers[0], SELECTED_FEATURES)
+
+    ###########################
+    # Derived data aggregation
+    ###########################
+    if args.derived_data:
+        generate_aggregated_features.create_all(data)

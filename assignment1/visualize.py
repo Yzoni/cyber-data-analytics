@@ -61,83 +61,18 @@ def fraud_per_feature_category(data):
         plt.show()
 
 
-def plot_visualizations(dataframe: pd.DataFrame):
-    # TODO hoe maken we een histogram/heatmap van twee discrete waarden, aangzien bijna alle variabelen discreet zijn?
+def print_fraud_counts(data: list):
+    fraud = 0
+    nonfraud = 0
 
-    fraud = dataframe[dataframe['fraud'] == 1]
-    non_fraud = dataframe[dataframe['fraud'] == 0]
-
-    outlier_fraction = len(fraud) / float(len(non_fraud))
-    print(outlier_fraction)
-    print('Cases which are Fraud:')
-    print(format(len(fraud)))
-    print('Cases which are NonFraud:')
-    print(format(len(non_fraud)))
-
-    pd.scatter_matrix(dataframe)
-    plt.show()
-
-    # correlation matrix
-    corrmat = dataframe.corr()
-    print(corrmat)
-    fig = plt.figure(figsize=(12, 9))
-    sns.heatmap(corrmat, vmax=0.8, square=True)
-    plt.show()
-
-    # less reliable results but better for computations
-    dataframe = dataframe.sample(frac=0.1, random_state=1)
-    print(dataframe.shape)
-
-    # plotting histogram of each feature
-    dataframe.hist(figsize=(20, 20))
-    plt.show()  # omzetten die type objecten ook naar float waardes.. meer histograms nodig van alle features... en kijk naar outliers
-
-    # all data colums and target data column
-    columns = dataframe.columns.tolist()
-    target = 'fraud'
-
-    columns = [c for c in columns if c not in ['fraud']]
-    all = dataframe[columns]
-    print(all.shape)
-
-    print('our target:')
-    target1 = dataframe[target]
-    print(target1.shape)
-
-    # random state
-    state = 1
-    # outlier detection methods
-    classifiers = {
-        "Isolation Forest": IsolationForest(max_samples=len(all), contamination=outlier_fraction,
-                                            random_state=state),
-        "Local Outlier Factor": LocalOutlierFactor(n_neighbors=20, contamination=outlier_fraction)}
-
-    n_outliers = len(fraud)  # fit data and tag outliers
-    for i, (clf_name, clf) in enumerate(classifiers.items()):
-        if clf_name == "Local Outlier Factor":
-            predictTarget = clf.fit_predict(all)
-            scores_pred = clf.negative_outlier_factor_
-    else:
-        clf.fit(all)
-        scores_pred = clf.decision_function(all)
-        predictTarget = clf.predict(all)
-
-    # Reshape prediction values to 0 for nonFraud and 1 for Fraud
-    predictTarget[predictTarget == 1] = 0
-    predictTarget[predictTarget == -1] = 1
-
-    numberErrors = (predictTarget != target1).sum()
-
-    # classification matrix
-    print('{}: {}'.format(clf_name, numberErrors))
-    print(accuracy_score(target1, predictTarget))
-    print(classification_report(target1,
-                                predictTarget))
-    # dit werkt, als we als die objects kunnen omzetten in float..
-    # TODO: gebruik hiervoor de "categorical_sets" die "load_data()" returned op een zelfde soort manier als in
-    # TODO "create_x_y_sets()" maar dan voor de pandas dataframe
-
-    return dataframe
+    for row in data:
+        if row['fraud'] == 1:
+            fraud += 1
+        else:
+            nonfraud += 1
+    print('Fraud transactins: {}'.format(fraud))
+    print('Non fraud transactions: {}'.format(nonfraud))
+    print('Ratio: {}'.format(fraud / nonfraud))
 
 
 def plot_roc_curve_compare(curves: list, title='Comparison of mean ROC curves'):
@@ -152,9 +87,15 @@ def plot_roc_curve_compare(curves: list, title='Comparison of mean ROC curves'):
         aucs = []
         mean_fpr = np.linspace(0, 1, 100)
         for clf, x_test, y_test in zip(fitted_classifiers, set_x_test, set_y_test):
-            y_score = clf.predict_proba(x_test)
+            if hasattr(clf, 'predict_proba'):
+                y_score = clf.predict_proba(x_test)
+                fpr, tpr, thresholds = roc_curve(y_test, y_score[:, 1])
+            elif hasattr(clf, 'decision_function'):
+                y_score = clf.decision_function(x_test)
+                fpr, tpr, thresholds = roc_curve(y_test, y_score)
+            else:
+                raise AttributeError('Classifier does not have a decision or probability function')
 
-            fpr, tpr, thresholds = roc_curve(y_test, y_score[:, 1])
             tprs.append(interp(mean_fpr, fpr, tpr))
             tprs[-1][0] = 0.0
             roc_auc = auc(fpr, tpr)
@@ -220,7 +161,7 @@ def plot_roc_curve_kfold(fitted_classifiers: list, set_x_test: list, set_y_test:
 def plot_decision_tree(clf, feature_names):
     export_graphviz(clf.estimators_[0],
                     feature_names=feature_names,
-                    class_names=['fraud','nonfraud'],
+                    class_names=['fraud', 'nonfraud'],
                     out_file='dotfile.dot',
                     filled=True,
                     rounded=True)
