@@ -6,3 +6,4 @@ seaborn
 CurrencyConverter
 sklearn
 scikit-learn
+python-dateutil
