@@ -1,0 +1,28 @@
+BATADAL sensor data- training dataset 1,2 & BATADAL sensor data- testing dataset:
+https://batadal.net/data.html
+
+
+L_T? =  Tank (indicates water level in T?)
+S_PU? = Pump (the status of pump P?)
+F_PU?=  Pump (
+F_V?=   Valve
+S_V?=   Valve
+P_J?=   Pipe (suction and discharge pressures of pumping station S1)
+ATT_FLAG=
+:
+https://batadal.net/images/rules.pdf
+https://brightspace.tudelft.nl/d2l/le/content/66306/viewContent/829714/View
+
+
+basic ARMA model:
+https://stackoverflow.com/questions/35860357/fitting-arma-model-to-time-series-indexed-by-time-in-python
+https://machinelearningmastery.com/autoregression-models-time-series-forecasting-python/
+http://www.statsmodels.org/dev/tsa.html#module-statsmodels.tsa
+
+
+Other:
+pandas
+autocorrelation plots
+
+
+Akaike’s Information Criterion (AIC
